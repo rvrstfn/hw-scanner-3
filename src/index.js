@@ -120,6 +120,92 @@ const HTML_PAGE = `<!DOCTYPE html>
         gap: 0.5rem;
         margin-bottom: 0.5rem;
       }
+      .employee-input {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .employee-input input {
+        flex: 1;
+      }
+      .picker-button {
+        padding: 0.6rem 0.9rem;
+        border-radius: 8px;
+        border: 1px solid #2563eb;
+        background: rgba(37, 99, 235, 0.1);
+        color: #1d4ed8;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .picker-button:hover {
+        background: rgba(37, 99, 235, 0.15);
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        z-index: 50;
+      }
+      .modal-panel {
+        width: min(500px, 100%);
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .modal-body {
+        padding: 1rem 1.25rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .modal-body input[type="search"] {
+        padding: 0.65rem;
+        border-radius: 8px;
+        border: 1px solid #cbd5f5;
+      }
+      .modal-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        max-height: 45vh;
+      }
+      .modal-list button {
+        width: 100%;
+        text-align: left;
+        padding: 0.6rem 0.75rem;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.95rem;
+      }
+      .modal-list button:hover,
+      .modal-list button:focus {
+        background: rgba(37, 99, 235, 0.12);
+        outline: none;
+      }
+      .modal-close {
+        border: none;
+        background: transparent;
+        font-size: 1.5rem;
+        cursor: pointer;
+        line-height: 1;
+      }
       .upload-buttons button {
         width: 100%;
         padding: 0.85rem;
@@ -222,6 +308,34 @@ const HTML_PAGE = `<!DOCTYPE html>
           border-color: #60a5fa;
           color: #bfdbfe;
         }
+        .employee-input input {
+          background: #111827;
+          color: inherit;
+        }
+        .picker-button {
+          border-color: rgba(96, 165, 250, 0.6);
+          background: rgba(96, 165, 250, 0.12);
+          color: #bfdbfe;
+        }
+        .picker-button:hover {
+          background: rgba(96, 165, 250, 0.18);
+        }
+        .modal-panel {
+          background: #1e293b;
+          color: inherit;
+        }
+        .modal-header {
+          border-color: rgba(148, 163, 184, 0.3);
+        }
+        .modal-body input[type="search"] {
+          background: #0f172a;
+          border-color: rgba(148, 163, 184, 0.3);
+          color: inherit;
+        }
+        .modal-list button:hover,
+        .modal-list button:focus {
+          background: rgba(96, 165, 250, 0.18);
+        }
         .upload-buttons button {
           border-color: rgba(96, 165, 250, 0.6);
           background: rgba(37, 99, 235, 0.15);
@@ -246,16 +360,32 @@ const HTML_PAGE = `<!DOCTYPE html>
       <p class="lead">Select your name, snap a clear photo of the barcode, and upload it for tracking.</p>
       <form id="scan-form">
         <label for="employee">Employee</label>
-        <input
-          id="employee"
-          name="employee"
-          type="text"
-          list="employee-list"
-          placeholder="Start typing your name"
-          autocomplete="off"
-          required
-        />
+        <div class="employee-input">
+          <input
+            id="employee"
+            name="employee"
+            type="text"
+            list="employee-list"
+            placeholder="Start typing your name"
+            autocomplete="off"
+            required
+          />
+          <button type="button" id="choose-employee" class="picker-button">Pick from list</button>
+        </div>
         <datalist id="employee-list"></datalist>
+
+        <section id="employee-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
+          <div class="modal-panel">
+            <header class="modal-header">
+              <h2 id="employee-modal-title">Choose your name</h2>
+              <button type="button" id="employee-modal-close" class="modal-close" aria-label="Close">×</button>
+            </header>
+            <div class="modal-body">
+              <input type="search" id="employee-modal-search" placeholder="Search employees" />
+              <ul id="employee-modal-list" class="modal-list"></ul>
+            </div>
+          </div>
+        </section>
 
         <label for="image">Barcode photo</label>
         <input
@@ -294,6 +424,59 @@ const HTML_PAGE = `<!DOCTYPE html>
       const statusBox = document.getElementById('status');
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
+      const employeePickerBtn = document.getElementById('choose-employee');
+      const employeeModal = document.getElementById('employee-modal');
+      const employeeModalClose = document.getElementById('employee-modal-close');
+      const employeeModalList = document.getElementById('employee-modal-list');
+      const employeeModalSearch = document.getElementById('employee-modal-search');
+      let employees = [];
+      let modalActive = false;
+
+      function openEmployeeModal() {
+        employeeModal.classList.remove('hidden');
+        employeeModalSearch.value = '';
+        filterEmployeeList('');
+        modalActive = true;
+        setTimeout(() => employeeModalSearch.focus(), 10);
+      }
+
+      function closeEmployeeModal() {
+        employeeModal.classList.add('hidden');
+        modalActive = false;
+      }
+
+      function filterEmployeeList(term) {
+        const lower = term.trim().toLowerCase();
+        const items = employees
+          .filter((name) => name.toLowerCase().includes(lower))
+          .map((name) => '<li><button type="button" data-name="' + name + '">' + name + '</button></li>')
+          .join('');
+        employeeModalList.innerHTML = items || '<li><em>No matches found</em></li>';
+      }
+
+      employeeModalList.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-name]');
+        if (!button) return;
+        employeeInput.value = button.dataset.name;
+        closeEmployeeModal();
+        employeeInput.focus();
+      });
+
+      employeePickerBtn.addEventListener('click', openEmployeeModal);
+      employeeModalClose.addEventListener('click', closeEmployeeModal);
+      employeeModalSearch.addEventListener('input', (event) => filterEmployeeList(event.target.value));
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && modalActive) {
+          closeEmployeeModal();
+        }
+      });
+
+      employeeModal.addEventListener('click', (event) => {
+        if (event.target === employeeModal) {
+          closeEmployeeModal();
+        }
+      });
       const uploadTrigger = document.getElementById('upload-trigger');
       const galleryTrigger = document.getElementById('gallery-trigger');
       const previewBox = document.getElementById('preview');
@@ -305,13 +488,15 @@ const HTML_PAGE = `<!DOCTYPE html>
         try {
           const res = await fetch('/api/employees');
           if (!res.ok) throw new Error('Failed to load employees');
-          const employees = await res.json();
+          const employeesData = await res.json();
+          employees = employeesData;
           employeeList.innerHTML = '';
           employees.forEach((name) => {
             const option = document.createElement('option');
             option.value = name;
             employeeList.appendChild(option);
           });
+          filterEmployeeList(employeeModalSearch.value);
         } catch (err) {
           showStatus(err.message, 'error');
         }
