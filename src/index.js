@@ -258,6 +258,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           name="image"
           type="file"
           accept="image/*"
+          capture="environment"
           class="file-input"
           required
         />
