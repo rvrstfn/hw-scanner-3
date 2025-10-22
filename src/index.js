@@ -104,9 +104,54 @@ const HTML_PAGE = `<!DOCTYPE html>
         font-weight: 600;
         cursor: pointer;
       }
+      button.secondary {
+        background: #1f2937;
+        color: #f9fafb;
+      }
       button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+      .file-input {
+        display: none;
+      }
+      .upload-trigger {
+        width: 100%;
+        padding: 0.85rem;
+        border-radius: 10px;
+        border: 1px dashed #2563eb;
+        background: rgba(37, 99, 235, 0.08);
+        color: #1d4ed8;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        transition: background 0.2s ease, color 0.2s ease;
+      }
+      .upload-trigger:hover {
+        background: rgba(37, 99, 235, 0.12);
+        color: #1e40af;
+      }
+      .preview {
+        margin-top: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border-radius: 10px;
+        background: rgba(37, 99, 235, 0.08);
+      }
+      .preview img {
+        width: 96px;
+        height: 96px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid rgba(37, 99, 235, 0.3);
+      }
+      .hidden {
+        display: none !important;
       }
       .status {
         margin-top: 1rem;
@@ -172,6 +217,21 @@ const HTML_PAGE = `<!DOCTYPE html>
           border-color: #60a5fa;
           color: #bfdbfe;
         }
+        .upload-trigger {
+          border-color: rgba(96, 165, 250, 0.6);
+          background: rgba(37, 99, 235, 0.15);
+          color: #bfdbfe;
+        }
+        .upload-trigger:hover {
+          background: rgba(37, 99, 235, 0.22);
+          color: #e0f2fe;
+        }
+        .preview {
+          background: rgba(96, 165, 250, 0.12);
+        }
+        .preview img {
+          border-color: rgba(96, 165, 250, 0.4);
+        }
       }
     </style>
   </head>
@@ -198,11 +258,19 @@ const HTML_PAGE = `<!DOCTYPE html>
           name="image"
           type="file"
           accept="image/*"
-          capture="environment"
+          class="file-input"
           required
         />
+        <button id="upload-trigger" type="button" class="upload-trigger">Snap or choose a photo</button>
+        <div id="preview" class="preview hidden">
+          <img id="preview-image" alt="Selected barcode preview" />
+          <div>
+            <strong>Preview</strong>
+            <p id="preview-meta"></p>
+          </div>
+        </div>
 
-        <button id="submit-btn" type="submit">Upload and Register</button>
+        <button id="submit-btn" type="submit">Scan &amp; register barcode</button>
       </form>
       <div id="status" class="status" role="status"></div>
     </main>
@@ -217,6 +285,11 @@ const HTML_PAGE = `<!DOCTYPE html>
       const statusBox = document.getElementById('status');
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
+      const uploadTrigger = document.getElementById('upload-trigger');
+      const previewBox = document.getElementById('preview');
+      const previewImage = document.getElementById('preview-image');
+      const previewMeta = document.getElementById('preview-meta');
+      let currentPreviewUrl = null;
 
       async function loadEmployees() {
         try {
@@ -238,6 +311,43 @@ const HTML_PAGE = `<!DOCTYPE html>
         statusBox.textContent = message;
         statusBox.className = 'status show ' + variant;
       }
+
+      function clearPreview() {
+        if (currentPreviewUrl) {
+          URL.revokeObjectURL(currentPreviewUrl);
+          currentPreviewUrl = null;
+        }
+        previewImage.removeAttribute('src');
+        previewMeta.textContent = '';
+        previewBox.classList.add('hidden');
+      }
+
+      function showPreview(file) {
+        if (!(file instanceof File)) {
+          clearPreview();
+          return;
+        }
+        if (currentPreviewUrl) {
+          URL.revokeObjectURL(currentPreviewUrl);
+        }
+        currentPreviewUrl = URL.createObjectURL(file);
+        previewImage.src = currentPreviewUrl;
+        previewMeta.textContent = formatBytes(file.size);
+        previewBox.classList.remove('hidden');
+      }
+
+      uploadTrigger.addEventListener('click', () => {
+        imageInput.click();
+      });
+
+      imageInput.addEventListener('change', () => {
+        const file = imageInput.files && imageInput.files[0];
+        if (file) {
+          showPreview(file);
+        } else {
+          clearPreview();
+        }
+      });
 
       function formatBytes(bytes) {
         if (!bytes) return '0 B';
@@ -395,6 +505,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             archiveMessage;
           showStatus(message, 'success');
           imageInput.value = '';
+          clearPreview();
         } catch (error) {
           showStatus(error.message || 'Unexpected error, please retry.', 'error');
         } finally {
