@@ -40,6 +40,8 @@ const DEFAULT_HEADERS = {
   'Access-Control-Allow-Methods': 'POST,OPTIONS,GET',
 };
 
+const ARCHIVE_CONTENT_TYPE = 'image/jpeg';
+
 const HTML_PAGE = `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -210,6 +212,9 @@ const HTML_PAGE = `<!DOCTYPE html>
     </main>
 
     <script type="module">
+      const MAX_UPLOAD_DIMENSION = 1600;
+      const JPEG_QUALITY = 0.7;
+
       const employeeInput = document.getElementById('employee');
       const employeeList = document.getElementById('employee-list');
       const form = document.getElementById('scan-form');
@@ -238,10 +243,113 @@ const HTML_PAGE = `<!DOCTYPE html>
         statusBox.className = 'status show ' + variant;
       }
 
+      function formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const units = ['B', 'KB', 'MB'];
+        const pow = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+        const value = bytes / 1024 ** pow;
+        return (pow === 0 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[pow];
+      }
+
+      async function loadImageSource(file) {
+        if (globalThis.createImageBitmap) {
+          try {
+            const bitmap = await createImageBitmap(file);
+            return {
+              source: bitmap,
+              width: bitmap.width,
+              height: bitmap.height,
+              cleanup() {
+                if (bitmap.close) bitmap.close();
+              },
+            };
+          } catch (error) {
+            console.warn('createImageBitmap failed, falling back to <img>', error);
+          }
+        }
+
+        return new Promise((resolve, reject) => {
+          const objectUrl = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve({
+              source: img,
+              width: img.naturalWidth || img.width,
+              height: img.naturalHeight || img.height,
+              cleanup() {},
+            });
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Unable to process image'));
+          };
+          img.src = objectUrl;
+        });
+      }
+
+      async function downscaleImage(file) {
+        try {
+          const { source, width: originalWidth, height: originalHeight, cleanup } = await loadImageSource(file);
+          const largestEdge = Math.max(originalWidth, originalHeight);
+          if (!largestEdge || largestEdge <= MAX_UPLOAD_DIMENSION) {
+            cleanup();
+            return file;
+          }
+
+          const scale = MAX_UPLOAD_DIMENSION / largestEdge;
+          const width = Math.max(1, Math.round(originalWidth * scale));
+          const height = Math.max(1, Math.round(originalHeight * scale));
+
+          let canvas;
+          if (typeof OffscreenCanvas !== 'undefined') {
+            canvas = new OffscreenCanvas(width, height);
+          } else {
+            canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+          }
+
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (!ctx) {
+            cleanup();
+            return file;
+          }
+
+          ctx.drawImage(source, 0, 0, width, height);
+          cleanup();
+
+          let blob;
+          if (canvas instanceof OffscreenCanvas) {
+            blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITY });
+          } else {
+            blob = await new Promise((resolve, reject) => {
+              canvas.toBlob(
+                (result) => (result ? resolve(result) : reject(new Error('Failed to compress image'))),
+                'image/jpeg',
+                JPEG_QUALITY,
+              );
+            });
+          }
+
+          const baseName = file.name && file.name.indexOf('.') !== -1 ? file.name.replace(/\.[^.]+$/, '') : 'barcode';
+          const scaledFile = new File([blob], baseName + '-scaled.jpg', {
+            type: 'image/jpeg',
+            lastModified: file.lastModified || Date.now(),
+          });
+          scaledFile.originalName = file.name;
+          scaledFile.originalSize = file.size;
+          return scaledFile;
+        } catch (error) {
+          console.warn('Image downscale failed, uploading original file', error);
+          return file;
+        }
+      }
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const employeeName = employeeInput.value.trim();
-        const file = imageInput.files?.[0];
+        const file = imageInput.files && imageInput.files[0];
 
         if (!employeeName) {
           showStatus('Please select your name before uploading.', 'error');
@@ -253,12 +361,19 @@ const HTML_PAGE = `<!DOCTYPE html>
         }
 
         submitBtn.disabled = true;
-        showStatus('Uploading and decoding barcode…', 'success');
 
         try {
+          const preparedFile = await downscaleImage(file);
+          const sizeDetails = preparedFile !== file ? ' (compressed to ' + formatBytes(preparedFile.size) + ')' : '';
+          showStatus('Uploading and decoding barcode' + sizeDetails + '…', 'success');
+
           const formData = new FormData();
           formData.append('employeeName', employeeName);
-          formData.append('image', file, file.name || 'barcode.jpg');
+          formData.append('image', preparedFile, preparedFile.name || file.name || 'barcode.jpg');
+          if (preparedFile.originalName) {
+            formData.append('originalFilename', preparedFile.originalName);
+          }
+          formData.append('sourceSize', String(file.size || 0));
 
           const response = await fetch('/api/scan', {
             method: 'POST',
@@ -272,12 +387,17 @@ const HTML_PAGE = `<!DOCTYPE html>
             return;
           }
 
-          showStatus(
-            \`Registered \${payload.assetCode} for \${payload.employeeName} at \${new Date(
-              payload.createdAt,
-            ).toLocaleString()}\`,
-            'success',
-          );
+          const archiveMessage = payload.imageUrl ? ' Photo archived for reference.' : '';
+          const message =
+            'Registered ' +
+            payload.assetCode +
+            ' for ' +
+            payload.employeeName +
+            ' at ' +
+            new Date(payload.createdAt).toLocaleString() +
+            '.' +
+            archiveMessage;
+          showStatus(message, 'success');
           imageInput.value = '';
         } catch (error) {
           showStatus(error.message || 'Unexpected error, please retry.', 'error');
@@ -349,6 +469,59 @@ async function decodeLinearBarcode(imageBuffer) {
   }
 }
 
+function randomId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return Math.random().toString(16).slice(2);
+}
+
+function generateArchiveKey() {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `scans/${timestamp}-${randomId()}.jpg`;
+}
+
+function buildImageUrl(request, scanId) {
+  if (!scanId) return null;
+  const url = new URL(request.url);
+  url.pathname = `/api/scans/${scanId}/image`;
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+async function storeArchiveImage(env, buffer, { type, employeeName, assetCode, originalFilename, sourceSize }) {
+  if (!env.ARCHIVE_BUCKET) {
+    throw new Error('Archive storage is not configured');
+  }
+
+  const key = generateArchiveKey();
+
+  const customMetadata = {};
+  if (employeeName) customMetadata.employeeName = employeeName;
+  if (assetCode) customMetadata.assetCode = assetCode;
+  if (originalFilename) customMetadata.originalFilename = originalFilename;
+  if (sourceSize) customMetadata.originalSize = String(sourceSize);
+
+  const metadata = Object.keys(customMetadata).length ? customMetadata : undefined;
+
+  await env.ARCHIVE_BUCKET.put(key, buffer, {
+    httpMetadata: {
+      contentType: type || ARCHIVE_CONTENT_TYPE,
+    },
+    customMetadata: metadata,
+  });
+
+  return key;
+}
+
+async function fetchArchiveImage(env, key) {
+  if (!env.ARCHIVE_BUCKET) {
+    throw new Error('Archive storage is not configured');
+  }
+  return env.ARCHIVE_BUCKET.get(key);
+}
+
 function handleOptions(request) {
   const headers = {
     ...DEFAULT_HEADERS,
@@ -382,22 +555,51 @@ async function handleScan(request, env) {
     return jsonResponse({ error: 'Image file was not included in the upload.' }, { status: 400 });
   }
 
+  if (!env.ARCHIVE_BUCKET) {
+    return jsonResponse({ error: 'Archive storage is not configured. Please contact the administrator.' }, { status: 500 });
+  }
+
   try {
     const buffer = await image.arrayBuffer();
     const result = await decodeLinearBarcode(buffer);
 
-    const inserted = await env.SCANS_DB.prepare(
-      'INSERT INTO scans (employee_name, asset_code) VALUES (?1, ?2) RETURNING id, created_at',
-    )
-      .bind(employeeName, result.text)
-      .first();
+    let imageKey;
+    try {
+      imageKey = await storeArchiveImage(env, buffer, {
+        type: image.type,
+        employeeName,
+        assetCode: result.text,
+        originalFilename: formData.get('originalFilename') ? String(formData.get('originalFilename')) : undefined,
+        sourceSize: formData.get('sourceSize') ? Number(formData.get('sourceSize')) : undefined,
+      });
+    } catch (archiveError) {
+      const message = archiveError instanceof Error ? archiveError.message : 'Unable to store the barcode photo.';
+      return jsonResponse({ error: message }, { status: 503 });
+    }
+
+    let inserted;
+    try {
+      inserted = await env.SCANS_DB.prepare(
+        'INSERT INTO scans (employee_name, asset_code, image_key) VALUES (?1, ?2, ?3) RETURNING id, created_at',
+      )
+        .bind(employeeName, result.text, imageKey)
+        .first();
+    } catch (dbError) {
+      await env.ARCHIVE_BUCKET.delete?.(imageKey).catch(() => {});
+      throw new Error('Unable to record scan. Please retry.');
+    }
+
+    const createdAt = inserted?.created_at ?? new Date().toISOString();
+    const scanId = inserted?.id;
 
     return jsonResponse(
       {
         employeeName,
         assetCode: result.text,
         barcodeFormat: result.format,
-        createdAt: inserted?.created_at ?? new Date().toISOString(),
+        createdAt,
+        imageKey,
+        imageUrl: buildImageUrl(request, scanId),
       },
       { status: 201 },
     );
@@ -407,21 +609,28 @@ async function handleScan(request, env) {
   }
 }
 
-async function handleScans(env) {
+async function handleScans(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT id, employee_name AS employeeName, asset_code AS assetCode, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    'SELECT id, employee_name AS employeeName, asset_code AS assetCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
   ).all();
-  return jsonResponse(results ?? []);
+  const scans = (results ?? []).map((row) => ({
+    ...row,
+    imageUrl: row.imageKey ? buildImageUrl(request, row.id) : null,
+  }));
+  return jsonResponse(scans);
 }
 
-async function handleCsv(env) {
+async function handleCsv(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT employee_name AS employeeName, asset_code AS assetCode, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    'SELECT id, employee_name AS employeeName, asset_code AS assetCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
   ).all();
-  const headers = ['Employee Name', 'Asset Code', 'Created At'];
-  const rows = (results ?? []).map((row) =>
-    [row.employeeName, row.assetCode, row.createdAt].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','),
-  );
+  const headers = ['Employee Name', 'Asset Code', 'Created At', 'Image URL'];
+  const rows = (results ?? []).map((row) => {
+    const imageUrl = row.imageKey ? buildImageUrl(request, row.id) : '';
+    return [row.employeeName, row.assetCode, row.createdAt, imageUrl]
+      .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+      .join(',');
+  });
   const csv = [headers.join(','), ...rows].join('\n');
   return new Response(csv, {
     headers: {
@@ -430,6 +639,33 @@ async function handleCsv(env) {
       ...DEFAULT_HEADERS,
     },
   });
+}
+
+async function handleImageDownload(env, scanId) {
+  const record = await env.SCANS_DB.prepare('SELECT image_key AS imageKey FROM scans WHERE id = ?1')
+    .bind(scanId)
+    .first();
+
+  if (!record?.imageKey) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const object = await fetchArchiveImage(env, record.imageKey);
+  if (!object) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const headers = new Headers({
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Access-Control-Allow-Origin': '*',
+  });
+  if (object.httpMetadata?.contentType) {
+    headers.set('Content-Type', object.httpMetadata.contentType);
+  } else {
+    headers.set('Content-Type', ARCHIVE_CONTENT_TYPE);
+  }
+
+  return new Response(object.body, { headers });
 }
 
 export default {
@@ -457,11 +693,16 @@ export default {
     }
 
     if (url.pathname === '/api/scans' && request.method === 'GET') {
-      return handleScans(env);
+      return handleScans(request, env);
     }
 
     if (url.pathname === '/api/scans.csv' && request.method === 'GET') {
-      return handleCsv(env);
+      return handleCsv(request, env);
+    }
+
+    const imageMatch = url.pathname.match(/^\/api\/scans\/(\d+)\/image$/);
+    if (imageMatch && request.method === 'GET') {
+      return handleImageDownload(env, Number(imageMatch[1]));
     }
 
     if (url.pathname === '/api/decode' && request.method === 'POST') {

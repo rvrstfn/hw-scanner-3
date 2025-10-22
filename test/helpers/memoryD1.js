@@ -9,6 +9,7 @@ export function createMemoryD1() {
       .map((row) => ({
         employeeName: row.employee_name,
         assetCode: row.asset_code,
+        imageKey: row.image_key,
         createdAt: row.created_at,
         id: row.id,
       }));
@@ -24,12 +25,13 @@ export function createMemoryD1() {
         },
         async first() {
           if (trimmed.startsWith('INSERT INTO SCANS')) {
-            const [employeeName, assetCode] = this.args ?? [];
+            const [employeeName, assetCode, imageKey] = this.args ?? [];
             const createdAt = new Date().toISOString();
             const record = {
               id: nextId++,
               employee_name: employeeName,
               asset_code: assetCode,
+              image_key: imageKey,
               created_at: createdAt,
             };
             scans.push(record);
@@ -37,6 +39,21 @@ export function createMemoryD1() {
           }
 
           if (trimmed.startsWith('SELECT')) {
+            if (trimmed.includes('WHERE ID')) {
+              const [id] = this.args ?? [];
+              const record = scans.find((row) => row.id === Number(id));
+              if (!record) {
+                return null;
+              }
+              return {
+                employeeName: record.employee_name,
+                assetCode: record.asset_code,
+                imageKey: record.image_key,
+                createdAt: record.created_at,
+                id: record.id,
+                image_key: record.image_key,
+              };
+            }
             return normalizeSelectResults(scans)[0] ?? null;
           }
 
@@ -52,6 +69,15 @@ export function createMemoryD1() {
         async run() {
           if (trimmed.startsWith('INSERT INTO SCANS')) {
             await this.first();
+            return { success: true };
+          }
+
+          if (trimmed.startsWith('DELETE FROM SCANS')) {
+            const [id] = this.args ?? [];
+            const index = scans.findIndex((row) => row.id === Number(id));
+            if (index !== -1) {
+              scans.splice(index, 1);
+            }
             return { success: true };
           }
 
