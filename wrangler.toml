@@ -6,7 +6,9 @@ compatibility_date = "2024-05-24"
 binding = "SCANS_DB"
 database_name = "hw_scanner_3"
 database_id = "5af51cb9-ca0e-4d39-a2f7-7431f61593bd"
+preview_database_id = "5af51cb9-ca0e-4d39-a2f7-7431f61593bd"
 
 [[r2_buckets]]
 binding = "ARCHIVE_BUCKET"
 bucket_name = "hw-scanner-archive"
+preview_bucket_name = "hw-scanner-archive"
