@@ -629,6 +629,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           })
           .join('');
         tbody.innerHTML = rows;
+        attachImageFallbacks();
       }
 
       function applyFilter() {
@@ -645,6 +646,16 @@ const ADMIN_PAGE = `<!DOCTYPE html>
         renderRows(filtered);
       }
 
+      function attachImageFallbacks() {
+        document.querySelectorAll('img.thumbnail').forEach((img) => {
+          img.onerror = () => {
+            const td = img.closest('td');
+            if (td) {
+              td.innerHTML = '<em>Photo unavailable</em>';
+            }
+          };
+        });
+      }
       async function fetchScans() {
         tbody.innerHTML = '<tr class="empty"><td colspan="4">Loading scans…</td></tr>';
         try {
