@@ -411,6 +411,262 @@ const HTML_PAGE = `<!DOCTYPE html>
   </body>
 </html>`;
 
+
+
+const ADMIN_PAGE = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hardware Scanner Admin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f5f5f5;
+        color: #111;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 1.5rem;
+        background: #1f2937;
+        color: #f9fafb;
+      }
+      header h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.8rem;
+      }
+      main {
+        flex: 1;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-width: 1024px;
+        width: 100%;
+        margin: 0 auto;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+      }
+      .toolbar input {
+        flex: 1;
+        min-width: 200px;
+        padding: 0.6rem;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+      }
+      .toolbar button,
+      .toolbar a {
+        padding: 0.65rem 1rem;
+        border-radius: 8px;
+        border: none;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .toolbar a.ghost {
+        background: transparent;
+        color: #2563eb;
+        border: 1px solid #2563eb;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+      th,
+      td {
+        padding: 0.65rem;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+        vertical-align: top;
+      }
+      tbody tr:hover {
+        background: rgba(37, 99, 235, 0.08);
+      }
+      .thumbnail {
+        width: 120px;
+        height: auto;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        display: block;
+      }
+      .empty {
+        text-align: center;
+        padding: 2rem;
+        color: #6b7280;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          background: #0f172a;
+          color: #f8fafc;
+        }
+        header {
+          background: #0f172a;
+        }
+        .toolbar input {
+          background: #1e293b;
+          color: inherit;
+          border-color: #334155;
+        }
+        .toolbar button,
+        .toolbar a {
+          background: #60a5fa;
+          color: #0b1c39;
+        }
+        .toolbar a.ghost {
+          color: #bfdbfe;
+          border-color: #60a5fa;
+          background: transparent;
+        }
+        table {
+          border-color: #1e293b;
+        }
+        th,
+        td {
+          border-color: #1e293b;
+        }
+        tbody tr:hover {
+          background: rgba(96, 165, 250, 0.12);
+        }
+        .thumbnail {
+          border-color: rgba(96, 165, 250, 0.5);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Hardware Scanner — Admin</h1>
+      <p>Review all barcode scans, including archived photos and metadata.</p>
+    </header>
+    <main>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search by employee or asset code" />
+        <button id="refresh-btn" type="button">Refresh</button>
+        <a class="ghost" href="/api/scans.csv" download>Download CSV</a>
+      </div>
+      <section id="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Asset Code</th>
+              <th>Captured At</th>
+              <th>Archived Photo</th>
+            </tr>
+          </thead>
+          <tbody id="scan-rows">
+            <tr class="empty">
+              <td colspan="4">Loading scans…</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module">
+      const tbody = document.getElementById('scan-rows');
+      const refreshBtn = document.getElementById('refresh-btn');
+      const searchInput = document.getElementById('search');
+      let scans = [];
+
+      function formatDate(value) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+          return value;
+        }
+        return date.toLocaleString();
+      }
+
+      function renderRows(list) {
+        if (!list || list.length === 0) {
+          tbody.innerHTML = '<tr class="empty"><td colspan="4">No scans recorded yet.</td></tr>';
+          return;
+        }
+
+        const rows = list
+          .map((scan) => {
+            const employee = scan.employeeName ?? '';
+            const asset = scan.assetCode ?? '';
+            const captured = formatDate(scan.createdAt);
+            const photo = scan.imageUrl
+              ? '<a href=\"' +
+                scan.imageUrl +
+                '\" target=\"_blank\" rel=\"noopener\"><img src=\"' +
+                scan.imageUrl +
+                '\" alt=\"Barcode photo for ' +
+                asset +
+                '\" class=\"thumbnail\" loading=\"lazy\" /></a>'
+              : '<em>No photo stored</em>';
+            return (
+              '<tr>' +
+              '<td>' +
+              employee +
+              '</td>' +
+              '<td>' +
+              asset +
+              '</td>' +
+              '<td>' +
+              captured +
+              '</td>' +
+              '<td>' +
+              photo +
+              '</td>' +
+              '</tr>'
+            );
+          })
+          .join('');
+        tbody.innerHTML = rows;
+      }
+
+      function applyFilter() {
+        const term = searchInput.value.trim().toLowerCase();
+        if (!term) {
+          renderRows(scans);
+          return;
+        }
+        const filtered = scans.filter((scan) => {
+          const employee = scan.employeeName?.toLowerCase() ?? '';
+          const asset = scan.assetCode?.toLowerCase() ?? '';
+          return employee.includes(term) || asset.includes(term);
+        });
+        renderRows(filtered);
+      }
+
+      async function fetchScans() {
+        tbody.innerHTML = '<tr class="empty"><td colspan="4">Loading scans…</td></tr>';
+        try {
+          const response = await fetch('/api/scans');
+          if (!response.ok) {
+            throw new Error('Failed to load scans');
+          }
+          scans = await response.json();
+          applyFilter();
+        } catch (error) {
+          tbody.innerHTML = '<tr class="empty"><td colspan="4">' + error.message + '</td></tr>';
+        }
+      }
+
+      refreshBtn.addEventListener('click', fetchScans);
+      searchInput.addEventListener('input', applyFilter);
+
+      fetchScans();
+    </script>
+  </body>
+</html>`;
+
 function jsonResponse(body, init) {
   return new Response(JSON.stringify(body), {
     headers: {
@@ -678,6 +934,14 @@ export default {
 
     if (url.pathname === '/' && request.method === 'GET') {
       return new Response(HTML_PAGE, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+        },
+      });
+    }
+
+    if (url.pathname === '/admin' && request.method === 'GET') {
+      return new Response(ADMIN_PAGE, {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
         },

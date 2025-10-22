@@ -12,6 +12,7 @@ Cloudflare Worker that powers a mobile-friendly web app for logging laptop barco
 - D1 storage for successful scans (employee, asset code, archived photo key)
 - R2 archive of each barcode photo
 - CSV (`/api/scans.csv`) and JSON (`/api/scans`) exports with direct photo links
+- Admin dashboard (`/admin`) to review all scans, search, and preview archived photos
 
 ## Setup
 
@@ -74,6 +75,7 @@ The test suite uses in-memory D1 and R2 shims, so no real database or bucket is 
 - `GET /api/scans` – JSON array of scans (most recent first, includes `imageUrl`)
 - `GET /api/scans.csv` – CSV export for Excel (with image URL column)
 - `GET /api/scans/:id/image` – Serves the archived JPEG from R2
+- `GET /admin` – Admin dashboard for browsing scans and photos
 - `POST /api/decode` – Raw JPEG decode endpoint (reuse of the original API)
 
 Error responses return JSON payloads with an `error` field explaining what went wrong.
