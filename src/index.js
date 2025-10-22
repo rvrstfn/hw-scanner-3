@@ -115,7 +115,12 @@ const HTML_PAGE = `<!DOCTYPE html>
       .file-input {
         display: none;
       }
-      .upload-trigger {
+      .upload-buttons {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+      .upload-buttons button {
         width: 100%;
         padding: 0.85rem;
         border-radius: 10px;
@@ -130,7 +135,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         gap: 0.5rem;
         transition: background 0.2s ease, color 0.2s ease;
       }
-      .upload-trigger:hover {
+      .upload-buttons button:hover {
         background: rgba(37, 99, 235, 0.12);
         color: #1e40af;
       }
@@ -217,12 +222,12 @@ const HTML_PAGE = `<!DOCTYPE html>
           border-color: #60a5fa;
           color: #bfdbfe;
         }
-        .upload-trigger {
+        .upload-buttons button {
           border-color: rgba(96, 165, 250, 0.6);
           background: rgba(37, 99, 235, 0.15);
           color: #bfdbfe;
         }
-        .upload-trigger:hover {
+        .upload-buttons button:hover {
           background: rgba(37, 99, 235, 0.22);
           color: #e0f2fe;
         }
@@ -262,7 +267,10 @@ const HTML_PAGE = `<!DOCTYPE html>
           class="file-input"
           required
         />
-        <button id="upload-trigger" type="button" class="upload-trigger">Snap or choose a photo</button>
+        <div class="upload-buttons">
+          <button id="upload-trigger" type="button" class="upload-trigger">Capture with camera</button>
+          <button id="gallery-trigger" type="button" class="upload-trigger secondary">Choose from gallery</button>
+        </div>
         <div id="preview" class="preview hidden">
           <img id="preview-image" alt="Selected barcode preview" />
           <div>
@@ -287,6 +295,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
       const uploadTrigger = document.getElementById('upload-trigger');
+      const galleryTrigger = document.getElementById('gallery-trigger');
       const previewBox = document.getElementById('preview');
       const previewImage = document.getElementById('preview-image');
       const previewMeta = document.getElementById('preview-meta');
@@ -338,6 +347,12 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
 
       uploadTrigger.addEventListener('click', () => {
+        imageInput.setAttribute('capture', 'environment');
+        imageInput.click();
+      });
+
+      galleryTrigger.addEventListener('click', () => {
+        imageInput.removeAttribute('capture');
         imageInput.click();
       });
 
