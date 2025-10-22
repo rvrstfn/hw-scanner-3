@@ -1,44 +1,53 @@
-# Cloudflare Barcode Decoder
+# Hardware Checkout Scanner
 
-This Worker exposes a simple HTTP API that extracts the **linear** (e.g. Code 128, UPC, EAN) barcode contained in a JPEG image. QR codes or other 2D symbologies in the same frame are ignored.
+Cloudflare Worker that powers a mobile-friendly web app for logging laptop barcode scans. Employees select their name, snap a photo of the asset sticker (linear barcode only), and the Worker decodes + stores the registration in D1.
+
+## What’s included
+
+- Mobile-first UI served from the Worker (`GET /`)
+- Employee roster with search suggestions
+- Camera capture + upload workflow (`POST /api/scan`)
+- Automatic barcode decode via ZXing (linear formats only)
+- D1 storage for successful scans
+- CSV (`/api/scans.csv`) and JSON (`/api/scans`) exports for Excel or auditing
+
+## Setup
+
+1. Install dependencies: `npm install`
+2. Create a D1 database:
+
+   ```bash
+   wrangler d1 create hw_scanner_3
+   wrangler d1 execute hw_scanner_3 --file=./db/schema.sql
+   ```
+
+   Update `wrangler.toml` with the generated `database_id`.
+
+3. (Optional) Adjust the employee roster in `src/index.js` (`EMPLOYEES` array).
 
 ## Local development
 
-1. Install dependencies once: `npm install`
-2. Start the Worker locally: `npm run dev -- --local`
-3. Send requests to `http://127.0.0.1:8787`
-
-## Try it with the bundled sample
-
-With the dev server running, decode the barcode provided in `barcode-QR-label.jpg`:
-
-```bash
-curl -s \
-  -H "Content-Type: image/jpeg" \
-  --data-binary @barcode-QR-label.jpg \
-  http://127.0.0.1:8787
+```
+npm run dev -- --local
 ```
 
-Expected response:
-
-```json
-{"text":"1E3012804 HBJ04724","format":"CODE_128"}
-```
-
-## Endpoint behavior
-
-- `GET /` – returns a short usage message.
-- `POST /` – accepts a JPEG image (`image/jpeg` or `application/octet-stream` body) and responds with the decoded linear barcode text and format.
-- `OPTIONS /` – CORS preflight support. CORS headers allow browser-based calls from any origin.
+Open `http://127.0.0.1:8787` on your phone/desktop. The “Download CSV” button will use the local D1 database populated by Wrangler.
 
 ## Automated test
 
-Run `npm test` to execute a local smoke test that imports the Worker directly and verifies the response for `barcode-QR-label.jpg`.
+```
+npm test
+```
 
-### Error cases
+Runs a smoke test against the bundled `barcode-QR-label.jpg` to ensure the decoder still returns the expected barcode (`CODE_128`).
 
-The API returns a 4xx response with a JSON payload describing the failure when:
+## API overview
 
-- The image cannot be parsed as JPEG.
-- No supported linear barcode is detected.
-- The request method or content type is not supported.
+- `GET /` – Web app UI
+- `GET /api/employees` – Current roster
+- `POST /api/scan` – Multipart form with `employeeName` + `image`
+- `GET /api/scans` – JSON array of scans (most recent first)
+- `GET /api/scans.csv` – CSV export for Excel
+- `POST /api/decode` – Raw JPEG decode endpoint (reuse of the original API)
+
+Error responses return JSON payloads with an `error` field explaining what went wrong.
