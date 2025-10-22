@@ -205,10 +205,6 @@ const HTML_PAGE = `<!DOCTYPE html>
         <button id="submit-btn" type="submit">Upload and Register</button>
       </form>
       <div id="status" class="status" role="status"></div>
-      <div class="actions">
-        <a href="/api/scans.csv" download>Download CSV</a>
-        <a href="/api/scans" target="_blank" rel="noopener">View JSON</a>
-      </div>
     </main>
 
     <script type="module">
