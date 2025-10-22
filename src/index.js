@@ -206,6 +206,34 @@ const HTML_PAGE = `<!DOCTYPE html>
         cursor: pointer;
         line-height: 1;
       }
+      .suggestions {
+        list-style: none;
+        margin: 0.35rem 0 0;
+        padding: 0;
+        border: 1px solid #cbd5f5;
+        border-radius: 8px;
+        background: #fff;
+        max-height: 220px;
+        overflow-y: auto;
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+      }
+      .suggestions li {
+        margin: 0;
+      }
+      .suggestions button {
+        width: 100%;
+        text-align: left;
+        padding: 0.6rem 0.85rem;
+        border: none;
+        background: transparent;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      .suggestions button:hover,
+      .suggestions button:focus {
+        background: rgba(37, 99, 235, 0.12);
+        outline: none;
+      }
       .upload-buttons button {
         width: 100%;
         padding: 0.85rem;
@@ -336,6 +364,14 @@ const HTML_PAGE = `<!DOCTYPE html>
         .modal-list button:focus {
           background: rgba(96, 165, 250, 0.18);
         }
+        .suggestions {
+          background: #0f172a;
+          border-color: rgba(148, 163, 184, 0.3);
+        }
+        .suggestions button:hover,
+        .suggestions button:focus {
+          background: rgba(96, 165, 250, 0.18);
+        }
         .upload-buttons button {
           border-color: rgba(96, 165, 250, 0.6);
           background: rgba(37, 99, 235, 0.15);
@@ -360,32 +396,17 @@ const HTML_PAGE = `<!DOCTYPE html>
       <p class="lead">Select your name, snap a clear photo of the barcode, and upload it for tracking.</p>
       <form id="scan-form">
         <label for="employee">Employee</label>
-        <div class="employee-input">
-          <input
-            id="employee"
-            name="employee"
-            type="text"
-            list="employee-list"
-            placeholder="Start typing your name"
-            autocomplete="off"
-            required
-          />
-          <button type="button" id="choose-employee" class="picker-button">Pick from list</button>
-        </div>
+        <input
+          id="employee"
+          name="employee"
+          type="text"
+          list="employee-list"
+          placeholder="Start typing your name"
+          autocomplete="off"
+          required
+        />
         <datalist id="employee-list"></datalist>
-
-        <section id="employee-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
-          <div class="modal-panel">
-            <header class="modal-header">
-              <h2 id="employee-modal-title">Choose your name</h2>
-              <button type="button" id="employee-modal-close" class="modal-close" aria-label="Close">×</button>
-            </header>
-            <div class="modal-body">
-              <input type="search" id="employee-modal-search" placeholder="Search employees" />
-              <ul id="employee-modal-list" class="modal-list"></ul>
-            </div>
-          </div>
-        </section>
+        <ul id="employee-suggestions" class="suggestions hidden"></ul>
 
         <label for="image">Barcode photo</label>
         <input
@@ -424,59 +445,46 @@ const HTML_PAGE = `<!DOCTYPE html>
       const statusBox = document.getElementById('status');
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
-      const employeePickerBtn = document.getElementById('choose-employee');
-      const employeeModal = document.getElementById('employee-modal');
-      const employeeModalClose = document.getElementById('employee-modal-close');
-      const employeeModalList = document.getElementById('employee-modal-list');
-      const employeeModalSearch = document.getElementById('employee-modal-search');
+      const suggestionList = document.getElementById('employee-suggestions');
       let employees = [];
-      let modalActive = false;
 
-      function openEmployeeModal() {
-        employeeModal.classList.remove('hidden');
-        employeeModalSearch.value = '';
-        filterEmployeeList('');
-        modalActive = true;
-        setTimeout(() => employeeModalSearch.focus(), 10);
-      }
-
-      function closeEmployeeModal() {
-        employeeModal.classList.add('hidden');
-        modalActive = false;
-      }
-
-      function filterEmployeeList(term) {
+      function renderSuggestions(term) {
         const lower = term.trim().toLowerCase();
-        const items = employees
-          .filter((name) => name.toLowerCase().includes(lower))
+        if (!lower) {
+          suggestionList.classList.add('hidden');
+          suggestionList.innerHTML = '';
+          return;
+        }
+        const matches = employees.filter((name) => name.toLowerCase().includes(lower)).slice(0, 6);
+        if (matches.length === 0) {
+          suggestionList.classList.add('hidden');
+          suggestionList.innerHTML = '';
+          return;
+        }
+        suggestionList.innerHTML = matches
           .map((name) => '<li><button type="button" data-name="' + name + '">' + name + '</button></li>')
           .join('');
-        employeeModalList.innerHTML = items || '<li><em>No matches found</em></li>';
+        suggestionList.classList.remove('hidden');
       }
 
-      employeeModalList.addEventListener('click', (event) => {
+      suggestionList.addEventListener('click', (event) => {
         const button = event.target.closest('button[data-name]');
         if (!button) return;
         employeeInput.value = button.dataset.name;
-        closeEmployeeModal();
+        suggestionList.classList.add('hidden');
         employeeInput.focus();
       });
 
-      employeePickerBtn.addEventListener('click', openEmployeeModal);
-      employeeModalClose.addEventListener('click', closeEmployeeModal);
-      employeeModalSearch.addEventListener('input', (event) => filterEmployeeList(event.target.value));
-
-      document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && modalActive) {
-          closeEmployeeModal();
+      document.addEventListener('click', (event) => {
+        if (!suggestionList.contains(event.target) && event.target !== employeeInput) {
+          suggestionList.classList.add('hidden');
         }
       });
 
-      employeeModal.addEventListener('click', (event) => {
-        if (event.target === employeeModal) {
-          closeEmployeeModal();
-        }
+      employeeInput.addEventListener('input', (event) => {
+        renderSuggestions(event.target.value);
       });
+
       const uploadTrigger = document.getElementById('upload-trigger');
       const galleryTrigger = document.getElementById('gallery-trigger');
       const previewBox = document.getElementById('preview');
@@ -496,7 +504,6 @@ const HTML_PAGE = `<!DOCTYPE html>
             option.value = name;
             employeeList.appendChild(option);
           });
-          filterEmployeeList(employeeModalSearch.value);
         } catch (err) {
           showStatus(err.message, 'error');
         }
