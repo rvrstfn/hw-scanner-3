@@ -40,6 +40,7 @@ npm test
 ```
 
 Runs a smoke test against the bundled `barcode-QR-label.jpg` to ensure the decoder still returns the expected barcode (`CODE_128`).
+The test suite uses an in-memory D1 shim, so no real database connection is required for CI/local runs.
 
 ## API overview
 
