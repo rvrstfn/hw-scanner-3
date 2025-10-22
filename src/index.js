@@ -67,6 +67,8 @@ const HTML_PAGE = `<!DOCTYPE html>
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
         padding: 2rem 1.75rem;
         width: min(460px, 100%);
+        position: relative;
+        overflow: visible;
       }
       h1 {
         margin-top: 0;
@@ -119,6 +121,64 @@ const HTML_PAGE = `<!DOCTYPE html>
         display: flex;
         gap: 0.5rem;
         margin-bottom: 0.5rem;
+      }
+      /* Modern Employee Selector Button */
+      .employee-selector {
+        width: 100%;
+        background: #fff;
+        border: 2px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 0;
+        margin-bottom: 1.5rem;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .employee-selector:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        transform: translateY(-1px);
+      }
+      .employee-selector:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+      }
+      .employee-selector-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+      }
+      .selected-employee {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+      }
+      .employee-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 16px;
+      }
+      .selected-employee span {
+        font-size: 16px;
+        color: #374151;
+        font-weight: 500;
+      }
+      .selector-arrow {
+        color: #9ca3af;
+        transition: transform 0.2s;
+      }
+      .employee-selector:hover .selector-arrow {
+        color: #3b82f6;
+        transform: translateY(1px);
       }
       .employee-input {
         display: flex;
@@ -206,33 +266,205 @@ const HTML_PAGE = `<!DOCTYPE html>
         cursor: pointer;
         line-height: 1;
       }
-      .suggestions {
-        list-style: none;
-        margin: 0.35rem 0 0;
-        padding: 0;
-        border: 1px solid #cbd5f5;
-        border-radius: 8px;
-        background: #fff;
-        max-height: 220px;
-        overflow-y: auto;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+      /* Employee Modal */
+      .employee-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: flex-end;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .suggestions li {
-        margin: 0;
+      .employee-modal:not(.hidden) {
+        opacity: 1;
+        visibility: visible;
       }
-      .suggestions button {
+      .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+      }
+      .modal-container {
+        position: relative;
         width: 100%;
-        text-align: left;
-        padding: 0.6rem 0.85rem;
-        border: none;
-        background: transparent;
-        font-size: 0.95rem;
-        cursor: pointer;
+        max-height: 85vh;
+        background: #fff;
+        border-radius: 24px 24px 0 0;
+        display: flex;
+        flex-direction: column;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .suggestions button:hover,
-      .suggestions button:focus {
-        background: rgba(37, 99, 235, 0.12);
+      .employee-modal:not(.hidden) .modal-container {
+        transform: translateY(0);
+      }
+      .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem 1.5rem 1rem;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .modal-header h2 {
+        margin: 0;
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: #111827;
+      }
+      .close-button {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #f3f4f6;
+        color: #6b7280;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .close-button:hover {
+        background: #e5e7eb;
+        color: #374151;
+        transform: scale(1.05);
+      }
+
+      /* Search Section */
+      .search-section {
+        padding: 0 1.5rem 1rem;
+      }
+      .search-bar {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .search-icon {
+        position: absolute;
+        left: 1rem;
+        color: #9ca3af;
+        z-index: 1;
+      }
+      .search-bar input {
+        width: 100%;
+        padding: 0.875rem 1rem 0.875rem 3rem;
+        border: 2px solid #f3f4f6;
+        border-radius: 16px;
+        font-size: 16px;
+        background: #f9fafb;
+        color: #111827;
+        transition: all 0.2s;
+      }
+      .search-bar input:focus {
         outline: none;
+        border-color: #3b82f6;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+      .clear-search {
+        position: absolute;
+        right: 0.75rem;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        background: #e5e7eb;
+        color: #6b7280;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .clear-search:hover {
+        background: #d1d5db;
+        transform: scale(1.1);
+      }
+
+      /* Employee Cards Grid */
+      .employees-grid {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 1.5rem 1.5rem;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        min-height: 200px;
+      }
+      .employee-card {
+        background: #fff;
+        border: 2px solid #f3f4f6;
+        border-radius: 16px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .employee-card:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+        transform: translateY(-2px);
+      }
+      .employee-card:active {
+        transform: translateY(0);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+      }
+      .employee-card .employee-avatar {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+      }
+      .employee-card .employee-name {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #111827;
+      }
+      .employee-card .employee-name mark {
+        background: rgba(59, 130, 246, 0.2);
+        color: #1d4ed8;
+        border-radius: 4px;
+        padding: 0 0.25rem;
+      }
+
+      /* Loading & Empty States */
+      .loading-state {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+      .skeleton-card {
+        background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 16px;
+        height: 80px;
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6b7280;
+      }
+      .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+      }
+      .empty-state h3 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+        color: #374151;
+      }
+      .empty-state p {
+        margin: 0;
+        font-size: 1rem;
       }
       .upload-buttons button {
         width: 100%;
@@ -364,13 +596,78 @@ const HTML_PAGE = `<!DOCTYPE html>
         .modal-list button:focus {
           background: rgba(96, 165, 250, 0.18);
         }
-        .suggestions {
-          background: #0f172a;
-          border-color: rgba(148, 163, 184, 0.3);
+        /* Dark Mode for New Modal Interface */
+        .employee-selector {
+          background: #1f2937;
+          border-color: rgba(75, 85, 99, 0.4);
         }
-        .suggestions button:hover,
-        .suggestions button:focus {
-          background: rgba(96, 165, 250, 0.18);
+        .employee-selector:hover {
+          border-color: #60a5fa;
+          box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2);
+        }
+        .selected-employee span {
+          color: #f9fafb;
+        }
+        .modal-container {
+          background: #1f2937;
+        }
+        .modal-header {
+          border-bottom-color: rgba(75, 85, 99, 0.3);
+        }
+        .modal-header h2 {
+          color: #f9fafb;
+        }
+        .close-button {
+          background: rgba(75, 85, 99, 0.4);
+          color: #d1d5db;
+        }
+        .close-button:hover {
+          background: rgba(75, 85, 99, 0.6);
+          color: #f9fafb;
+        }
+        .search-bar input {
+          background: #374151;
+          border-color: rgba(75, 85, 99, 0.4);
+          color: #f9fafb;
+        }
+        .search-bar input:focus {
+          background: #4b5563;
+          border-color: #60a5fa;
+          box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+        }
+        .search-bar input::placeholder {
+          color: #9ca3af;
+        }
+        .clear-search {
+          background: rgba(75, 85, 99, 0.5);
+          color: #d1d5db;
+        }
+        .clear-search:hover {
+          background: rgba(75, 85, 99, 0.7);
+        }
+        .employee-card {
+          background: #374151;
+          border-color: rgba(75, 85, 99, 0.4);
+        }
+        .employee-card:hover {
+          border-color: #60a5fa;
+          box-shadow: 0 8px 25px rgba(96, 165, 250, 0.2);
+        }
+        .employee-card .employee-name {
+          color: #f9fafb;
+        }
+        .employee-card .employee-name mark {
+          background: rgba(96, 165, 250, 0.25);
+          color: #bfdbfe;
+        }
+        .skeleton-card {
+          background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+        }
+        .empty-state {
+          color: #9ca3af;
+        }
+        .empty-state h3 {
+          color: #d1d5db;
         }
         .upload-buttons button {
           border-color: rgba(96, 165, 250, 0.6);
@@ -396,17 +693,59 @@ const HTML_PAGE = `<!DOCTYPE html>
       <p class="lead">Select your name, snap a clear photo of the barcode, and upload it for tracking.</p>
       <form id="scan-form">
         <label for="employee">Employee</label>
-        <input
-          id="employee"
-          name="employee"
-          type="text"
-          list="employee-list"
-          placeholder="Start typing your name"
-          autocomplete="off"
-          required
-        />
-        <datalist id="employee-list"></datalist>
-        <ul id="employee-suggestions" class="suggestions hidden"></ul>
+        <button type="button" id="employee-selector" class="employee-selector">
+          <div class="employee-selector-content">
+            <div class="selected-employee" id="selected-employee">
+              <div class="employee-avatar">?</div>
+              <span>Tap to select your name</span>
+            </div>
+            <svg class="selector-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </button>
+        <input type="hidden" id="employee" name="employee" required />
+
+        <!-- Employee Selection Modal -->
+        <div id="employee-modal" class="employee-modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-container">
+            <div class="modal-header">
+              <h2>Select Employee</h2>
+              <button type="button" id="close-modal" class="close-button">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <div class="search-section">
+              <div class="search-bar">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+                  <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input type="search" id="employee-search" placeholder="Search employees..." autocomplete="off">
+                <button type="button" id="clear-search" class="clear-search hidden">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="employees-grid" id="employees-grid">
+              <div class="loading-state">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+              </div>
+            </div>
+            <div class="empty-state hidden" id="empty-state">
+              <div class="empty-icon">🔍</div>
+              <h3>No employees found</h3>
+              <p>Try adjusting your search terms</p>
+            </div>
+          </div>
+        </div>
 
         <label for="image">Barcode photo</label>
         <input
@@ -439,50 +778,197 @@ const HTML_PAGE = `<!DOCTYPE html>
       const MAX_UPLOAD_DIMENSION = 1600;
       const JPEG_QUALITY = 0.7;
 
+      // Modern Modal Employee Selector
       const employeeInput = document.getElementById('employee');
-      const employeeList = document.getElementById('employee-list');
+      const employeeSelector = document.getElementById('employee-selector');
+      const selectedEmployeeDisplay = document.getElementById('selected-employee');
+      const employeeModal = document.getElementById('employee-modal');
+      const closeModalBtn = document.getElementById('close-modal');
+      const employeeSearch = document.getElementById('employee-search');
+      const clearSearchBtn = document.getElementById('clear-search');
+      const employeesGrid = document.getElementById('employees-grid');
+      const emptyState = document.getElementById('empty-state');
       const form = document.getElementById('scan-form');
       const statusBox = document.getElementById('status');
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
-      const suggestionList = document.getElementById('employee-suggestions');
-      let employees = [];
 
-      function renderSuggestions(term) {
-        const lower = term.trim().toLowerCase();
-        if (!lower) {
-          suggestionList.classList.add('hidden');
-          suggestionList.innerHTML = '';
-          return;
-        }
-        const matches = employees.filter((name) => name.toLowerCase().includes(lower)).slice(0, 6);
-        if (matches.length === 0) {
-          suggestionList.classList.add('hidden');
-          suggestionList.innerHTML = '';
-          return;
-        }
-        suggestionList.innerHTML = matches
-          .map((name) => '<li><button type="button" data-name="' + name + '">' + name + '</button></li>')
-          .join('');
-        suggestionList.classList.remove('hidden');
+      let employees = [];
+      let filteredEmployees = [];
+      let selectedEmployee = null;
+      let searchTimeout;
+
+      // Generate avatar initials and colors
+      function getEmployeeAvatar(name) {
+        const initials = name.split(' ')
+          .map(word => word.charAt(0))
+          .join('')
+          .substring(0, 2);
+
+        // Generate consistent color based on name
+        const colors = [
+          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+          'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+          'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+          'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+          'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+          'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+        ];
+        const colorIndex = name.length % colors.length;
+        return { initials, background: colors[colorIndex] };
       }
 
-      suggestionList.addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-name]');
-        if (!button) return;
-        employeeInput.value = button.dataset.name;
-        suggestionList.classList.add('hidden');
-        employeeInput.focus();
-      });
+      // Highlight search matches
+      function highlightText(text, query) {
+        if (!query) return text;
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const index = lowerText.indexOf(lowerQuery);
+        if (index === -1) return text;
 
-      document.addEventListener('click', (event) => {
-        if (!suggestionList.contains(event.target) && event.target !== employeeInput) {
-          suggestionList.classList.add('hidden');
+        return text.substring(0, index) +
+               '<mark>' + text.substring(index, index + query.length) + '</mark>' +
+               highlightText(text.substring(index + query.length), query);
+      }
+
+      // Update selected employee display
+      function updateSelectedEmployee(employeeName) {
+        selectedEmployee = employeeName;
+        employeeInput.value = employeeName;
+
+        const avatar = getEmployeeAvatar(employeeName);
+        const avatarElement = selectedEmployeeDisplay.querySelector('.employee-avatar');
+        const nameElement = selectedEmployeeDisplay.querySelector('span');
+
+        avatarElement.textContent = avatar.initials;
+        avatarElement.style.background = avatar.background;
+        nameElement.textContent = employeeName;
+      }
+
+      // Render employee cards
+      function renderEmployees(searchTerm = '') {
+        const query = searchTerm.toLowerCase();
+        filteredEmployees = employees.filter(name =>
+          name.toLowerCase().includes(query)
+        );
+
+        if (filteredEmployees.length === 0) {
+          employeesGrid.innerHTML = '';
+          emptyState.classList.remove('hidden');
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+
+        employeesGrid.innerHTML = filteredEmployees
+          .map(name => {
+            const avatar = getEmployeeAvatar(name);
+            const highlighted = highlightText(name, searchTerm);
+            return '<div class="employee-card" data-name="' + name + '">' +
+                   '<div class="employee-avatar" style="background: ' + avatar.background + '">' +
+                   avatar.initials +
+                   '</div>' +
+                   '<div class="employee-name">' + highlighted + '</div>' +
+                   '</div>';
+          })
+          .join('');
+      }
+
+      // Open modal
+      function openModal() {
+        employeeModal.classList.remove('hidden');
+        employeeSearch.value = '';
+        employeeSearch.focus();
+        renderEmployees();
+        document.body.style.overflow = 'hidden';
+      }
+
+      // Close modal
+      function closeModal() {
+        employeeModal.classList.add('hidden');
+        document.body.style.overflow = '';
+        employeeSearch.value = '';
+        clearSearchBtn.classList.add('hidden');
+      }
+
+      // Select employee
+      function selectEmployee(employeeName) {
+        updateSelectedEmployee(employeeName);
+        closeModal();
+
+        // Add subtle success feedback
+        employeeSelector.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+          employeeSelector.style.transform = '';
+        }, 150);
+      }
+
+      // Event Listeners
+      employeeSelector.addEventListener('click', openModal);
+      closeModalBtn.addEventListener('click', closeModal);
+
+      // Close modal when clicking backdrop
+      employeeModal.addEventListener('click', (event) => {
+        if (event.target === employeeModal || event.target.classList.contains('modal-backdrop')) {
+          closeModal();
         }
       });
 
-      employeeInput.addEventListener('input', (event) => {
-        renderSuggestions(event.target.value);
+      // Employee card selection
+      employeesGrid.addEventListener('click', (event) => {
+        const card = event.target.closest('.employee-card');
+        if (card) {
+          const employeeName = card.dataset.name;
+          selectEmployee(employeeName);
+        }
+      });
+
+      // Search functionality with debounce
+      employeeSearch.addEventListener('input', (event) => {
+        const searchTerm = event.target.value;
+
+        // Show/hide clear button
+        if (searchTerm) {
+          clearSearchBtn.classList.remove('hidden');
+        } else {
+          clearSearchBtn.classList.add('hidden');
+        }
+
+        // Debounced search
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          renderEmployees(searchTerm);
+        }, 150);
+      });
+
+      // Clear search
+      clearSearchBtn.addEventListener('click', () => {
+        employeeSearch.value = '';
+        clearSearchBtn.classList.add('hidden');
+        renderEmployees();
+        employeeSearch.focus();
+      });
+
+      // Keyboard shortcuts
+      employeeSearch.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          if (employeeSearch.value) {
+            employeeSearch.value = '';
+            clearSearchBtn.classList.add('hidden');
+            renderEmployees();
+          } else {
+            closeModal();
+          }
+        }
+      });
+
+      // Global keyboard shortcut
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !employeeModal.classList.contains('hidden')) {
+          closeModal();
+        }
       });
 
       const uploadTrigger = document.getElementById('upload-trigger');
@@ -498,14 +984,24 @@ const HTML_PAGE = `<!DOCTYPE html>
           if (!res.ok) throw new Error('Failed to load employees');
           const employeesData = await res.json();
           employees = employeesData;
-          employeeList.innerHTML = '';
-          employees.forEach((name) => {
-            const option = document.createElement('option');
-            option.value = name;
-            employeeList.appendChild(option);
-          });
+
+          // Hide loading skeleton
+          const loadingState = document.querySelector('.loading-state');
+          if (loadingState) {
+            loadingState.style.display = 'none';
+          }
+
+          // Show success briefly
+          showStatus('Ready to scan!', 'success');
+          setTimeout(() => statusBox.classList.remove('show'), 2000);
         } catch (err) {
-          showStatus(err.message, 'error');
+          showStatus('Failed to load employees. Please refresh.', 'error');
+
+          // Hide loading skeleton even on error
+          const loadingState = document.querySelector('.loading-state');
+          if (loadingState) {
+            loadingState.style.display = 'none';
+          }
         }
       }
 
