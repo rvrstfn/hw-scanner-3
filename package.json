@@ -1,0 +1,26 @@
+{
+  "name": "hw-scanner-3",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker API for decoding linear barcodes from uploaded images",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/decode.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rvrstfn/hw-scanner-3.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rvrstfn/hw-scanner-3/issues"
+  },
+  "homepage": "https://github.com/rvrstfn/hw-scanner-3#readme",
+  "dependencies": {
+    "@zxing/library": "^0.21.3",
+    "jpeg-js": "^0.4.4"
+  }
+}
