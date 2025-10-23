@@ -115,8 +115,38 @@ const HTML_PAGE = `<!DOCTYPE html>
         opacity: 0.6;
         cursor: not-allowed;
       }
+      .form-step {
+        margin-bottom: 1.75rem;
+      }
+      .form-step:last-of-type {
+        margin-bottom: 0;
+      }
+      .step-heading {
+        margin: 0 0 0.75rem;
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 1rem;
+      }
+      .step-number {
+        color: #2563eb;
+        font-weight: 700;
+      }
       .file-input {
         display: none;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
       .upload-buttons {
         display: flex;
@@ -130,7 +160,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         border: 2px solid #e5e7eb;
         border-radius: 16px;
         padding: 0;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0;
         cursor: pointer;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -680,18 +710,24 @@ const HTML_PAGE = `<!DOCTYPE html>
           border-color: #60a5fa;
           box-shadow: 0 8px 25px rgba(96, 165, 250, 0.2);
         }
-      .employee-card .employee-name {
-        color: #f9fafb;
-      }
-      .employee-secondary {
-        color: #e2e8f0;
-      }
-      .employee-email {
-        color: #cbd5f5;
-      }
+        .employee-card .employee-name {
+          color: #f9fafb;
+        }
         .employee-card .employee-name mark {
           background: rgba(96, 165, 250, 0.25);
           color: #bfdbfe;
+        }
+        .employee-secondary {
+          color: #e2e8f0;
+        }
+        .employee-email {
+          color: #cbd5f5;
+        }
+        .step-heading {
+          color: #e5e7eb;
+        }
+        .step-number {
+          color: #60a5fa;
         }
         .skeleton-card {
           background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
@@ -722,23 +758,24 @@ const HTML_PAGE = `<!DOCTYPE html>
   </head>
   <body>
     <main class="card">
-      <h1>Log Hardware Checkout</h1>
-      <p class="lead">Select your name, snap a clear photo of the barcode, and upload it for tracking.</p>
+      <h1>Hardware inventory</h1>
       <form id="scan-form">
-        <label for="employee">Employee</label>
-        <button type="button" id="employee-selector" class="employee-selector">
-          <div class="employee-selector-content">
-            <div class="selected-employee" id="selected-employee">
-              <div class="employee-avatar">?</div>
-              <span>Tap to select your name</span>
+        <section class="form-step">
+          <p class="step-heading"><span class="step-number">1.</span> Select your name</p>
+          <button type="button" id="employee-selector" class="employee-selector">
+            <div class="employee-selector-content">
+              <div class="selected-employee" id="selected-employee">
+                <div class="employee-avatar">?</div>
+                <span>Select</span>
+              </div>
+              <svg class="selector-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
             </div>
-            <svg class="selector-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </button>
-        <input type="hidden" id="employee" name="employee" required />
-        <input type="hidden" id="employee-email" name="employeeEmail" />
+          </button>
+          <input type="hidden" id="employee" name="employee" required />
+          <input type="hidden" id="employee-email" name="employeeEmail" />
+        </section>
 
         <!-- Employee Selection Modal -->
         <div id="employee-modal" class="employee-modal hidden">
@@ -780,30 +817,35 @@ const HTML_PAGE = `<!DOCTYPE html>
             </div>
           </div>
         </div>
-
-        <label for="image">Barcode photo</label>
-        <input
-          id="image"
-          name="image"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          class="file-input"
-          required
-        />
-        <div class="upload-buttons">
-          <button id="upload-trigger" type="button" class="upload-trigger">Capture with camera</button>
-          <button id="gallery-trigger" type="button" class="upload-trigger secondary">Choose from gallery</button>
-        </div>
-        <div id="preview" class="preview hidden">
-          <img id="preview-image" alt="Selected barcode preview" />
-          <div>
-            <strong>Preview</strong>
-            <p id="preview-meta"></p>
+        <section class="form-step">
+          <p class="step-heading"><span class="step-number">2.</span> Take a photo of the label</p>
+          <label class="visually-hidden" for="image">Upload barcode photo</label>
+          <input
+            id="image"
+            name="image"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            class="file-input"
+            required
+          />
+          <div class="upload-buttons">
+            <button id="upload-trigger" type="button" class="upload-trigger">Capture with camera</button>
+            <button id="gallery-trigger" type="button" class="upload-trigger secondary">Choose from gallery</button>
           </div>
-        </div>
+          <div id="preview" class="preview hidden">
+            <img id="preview-image" alt="Selected barcode preview" />
+            <div>
+              <strong>Preview</strong>
+              <p id="preview-meta"></p>
+            </div>
+          </div>
+        </section>
 
-        <button id="submit-btn" type="submit">Scan &amp; register barcode</button>
+        <section class="form-step">
+          <p class="step-heading"><span class="step-number">3.</span> Upload</p>
+          <button id="submit-btn" type="submit">Upload label</button>
+        </section>
       </form>
       <div id="status" class="status" role="status"></div>
     </main>
@@ -835,6 +877,23 @@ const HTML_PAGE = `<!DOCTYPE html>
       let searchTimeout;
       let viewportHandler;
       let rosterRequiresEmail = false;
+
+      async function parseJsonResponse(response, contextMessage) {
+        try {
+          return await response.clone().json();
+        } catch (error) {
+          const rawBody = await response.text();
+          const trimmed = rawBody.trim();
+          console.warn('Non-JSON response received', { contextMessage, trimmed });
+          if (trimmed.startsWith('<!DOCTYPE')) {
+            throw new Error(contextMessage || 'Server sent an unexpected HTML response. Please retry.');
+          }
+          if (trimmed) {
+            throw new Error(contextMessage || 'Server sent an unexpected response: ' + trimmed.slice(0, 120));
+          }
+          throw new Error(contextMessage || 'Server sent an empty response. Please try again.');
+        }
+      }
 
       function updateKeyboardOffset() {
         if (!window.visualViewport) return;
@@ -925,7 +984,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         avatarElement.textContent = avatar.initials;
         avatarElement.style.background = avatar.background;
-        nameElement.textContent = displayName || 'Tap to select your name';
+        nameElement.textContent = displayName || 'Select';
       }
 
       // Render employee cards
@@ -1099,7 +1158,10 @@ const HTML_PAGE = `<!DOCTYPE html>
         try {
           const res = await fetch('/api/employees');
           if (!res.ok) throw new Error('Failed to load employees');
-          const employeesData = await res.json();
+          const employeesData = await parseJsonResponse(
+            res,
+            'Failed to parse employee directory response. Please refresh.',
+          );
           employees = (Array.isArray(employeesData) ? employeesData : [])
             .map((entry) => {
               if (entry && typeof entry === 'object') {
@@ -1355,7 +1417,10 @@ const HTML_PAGE = `<!DOCTYPE html>
             body: formData,
           });
 
-          const payload = await response.json();
+          const payload = await parseJsonResponse(
+            response,
+            'Server returned an unexpected response while processing the scan.',
+          );
           if (!response.ok) {
             showStatus(payload.error || 'Unable to register this scan, please try again.', 'error');
             submitBtn.disabled = false;
@@ -1564,6 +1629,23 @@ const ADMIN_PAGE = `<!DOCTYPE html>
       const searchInput = document.getElementById('search');
       let scans = [];
 
+      async function parseJsonResponse(response, contextMessage) {
+        try {
+          return await response.clone().json();
+        } catch (error) {
+          const rawBody = await response.text();
+          const trimmed = rawBody.trim();
+          console.warn('Non-JSON response received (admin)', { contextMessage, trimmed });
+          if (trimmed.startsWith('<!DOCTYPE')) {
+            throw new Error(contextMessage || 'Server sent an unexpected HTML response. Please retry.');
+          }
+          if (trimmed) {
+            throw new Error(contextMessage || 'Server sent an unexpected response: ' + trimmed.slice(0, 120));
+          }
+          throw new Error(contextMessage || 'Server sent an empty response. Please try again.');
+        }
+      }
+
       function formatDate(value) {
         if (!value) return '';
         const date = new Date(value);
@@ -1666,7 +1748,10 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           if (!response.ok) {
             throw new Error('Failed to load scans');
           }
-          scans = await response.json();
+          scans = await parseJsonResponse(
+            response,
+            'Admin data response could not be parsed. Please refresh.',
+          );
           applyFilter();
         } catch (error) {
           tbody.innerHTML = '<tr class="empty"><td colspan="6">' + error.message + '</td></tr>';
