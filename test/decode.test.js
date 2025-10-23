@@ -37,7 +37,11 @@ async function run() {
   await assert(scanPayload.employeeName === 'Alex Johnson', 'Recorded name mismatch');
   await assert(scanPayload.employeeEmail === 'alex.johnson@example.com', 'Recorded email mismatch');
   await assert(typeof scanPayload.imageKey === 'string' && scanPayload.imageKey.length > 0, 'Missing image key in response');
-  await assert(typeof scanPayload.imageUrl === 'string', 'Missing image URL in response');
+  await assert(
+    typeof scanPayload.imageUrl === 'string' &&
+      scanPayload.imageUrl.startsWith('http://localhost/api/scans/1/image?v='),
+    'Missing image URL in response',
+  );
   await assert(env.ARCHIVE_BUCKET.store.size === 1, 'Archive image was not stored');
 
   const listResponse = await worker.fetch(new Request('http://localhost/api/scans'), env);
@@ -62,7 +66,7 @@ async function run() {
   console.log('CSV export:\n', csvText);
   await assert(csvText.includes('Alex Johnson'), 'CSV missing employee name');
   await assert(csvText.toLowerCase().includes('alex.johnson@example.com'), 'CSV missing employee email');
-  await assert(csvText.includes('/api/scans/1/image'), 'CSV missing image link');
+  await assert(csvText.includes('/api/scans/1/image?v='), 'CSV missing image link');
   await assert(csvText.includes('E3012804'), 'CSV missing model code');
   await assert(csvText.includes('HBJ04724'), 'CSV missing asset tag');
 }

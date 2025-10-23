@@ -1760,6 +1760,14 @@ function buildImageUrl(request, scanId) {
   return url.toString();
 }
 
+function buildVersionedImageUrl(request, scanId, imageKey) {
+  const base = buildImageUrl(request, scanId);
+  if (!base || !imageKey) return base;
+  const url = new URL(base);
+  url.searchParams.set('v', imageKey);
+  return url.toString();
+}
+
 async function storeArchiveImage(
   env,
   buffer,
@@ -2089,7 +2097,7 @@ async function handleScan(request, env) {
         barcodeFormat: result.format,
         createdAt,
         imageKey,
-        imageUrl: buildImageUrl(request, scanId),
+        imageUrl: buildVersionedImageUrl(request, scanId, imageKey),
       },
       { status: 201 },
     );
@@ -2118,7 +2126,7 @@ async function handleScans(request, env) {
     return {
       ...row,
       assetCode,
-      imageUrl: row.imageKey ? buildImageUrl(request, row.id) : null,
+      imageUrl: row.imageKey ? buildVersionedImageUrl(request, row.id, row.imageKey) : null,
     };
   });
   return jsonResponse(scans);
@@ -2140,7 +2148,7 @@ async function handleCsv(request, env) {
   ).all();
   const headers = ['Employee Name', 'Employee Email', 'Model Code', 'Asset Tag', 'Raw Barcode', 'Created At', 'Image URL'];
   const rows = (results ?? []).map((row) => {
-    const imageUrl = row.imageKey ? buildImageUrl(request, row.id) : '';
+    const imageUrl = row.imageKey ? buildVersionedImageUrl(request, row.id, row.imageKey) : '';
     const combined = row.modelCode && row.assetTag ? `${row.modelCode} ${row.assetTag}`.trim() : '';
     const rawBarcode = row.rawCode ?? combined;
     return [
