@@ -269,10 +269,8 @@ function main() {
   }
 
   const statements = [
-    'BEGIN TRANSACTION;',
     ...buildInsertStatements(records),
     buildSoftDeleteStatement(records.map((r) => r.email)),
-    'COMMIT;',
   ];
 
   const sql = statements.join('\n\n');
