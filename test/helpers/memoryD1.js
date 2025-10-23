@@ -6,13 +6,20 @@ export function createMemoryD1() {
     return results
       .slice()
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .map((row) => ({
-        employeeName: row.employee_name,
-        assetCode: row.asset_code,
-        imageKey: row.image_key,
-        createdAt: row.created_at,
-        id: row.id,
-      }));
+      .map((row) => {
+        const assetCode =
+          row.model_code && row.asset_tag ? `${row.model_code} ${row.asset_tag}`.trim() : row.raw_code ?? '';
+        return {
+          employeeName: row.employee_name,
+          modelCode: row.model_code,
+          assetTag: row.asset_tag,
+          rawCode: row.raw_code,
+          assetCode,
+          imageKey: row.image_key,
+          createdAt: row.created_at,
+          id: row.id,
+        };
+      });
   }
 
   return {
@@ -25,12 +32,14 @@ export function createMemoryD1() {
         },
         async first() {
           if (trimmed.startsWith('INSERT INTO SCANS')) {
-            const [employeeName, assetCode, imageKey] = this.args ?? [];
+            const [employeeName, modelCode, assetTag, rawCode, imageKey] = this.args ?? [];
             const createdAt = new Date().toISOString();
             const record = {
               id: nextId++,
               employee_name: employeeName,
-              asset_code: assetCode,
+              model_code: modelCode,
+              asset_tag: assetTag,
+              raw_code: rawCode,
               image_key: imageKey,
               created_at: createdAt,
             };
@@ -47,7 +56,13 @@ export function createMemoryD1() {
               }
               return {
                 employeeName: record.employee_name,
-                assetCode: record.asset_code,
+                modelCode: record.model_code,
+                assetTag: record.asset_tag,
+                rawCode: record.raw_code,
+                assetCode:
+                  record.model_code && record.asset_tag
+                    ? `${record.model_code} ${record.asset_tag}`.trim()
+                    : record.raw_code ?? '',
                 imageKey: record.image_key,
                 createdAt: record.created_at,
                 id: record.id,

@@ -29,7 +29,10 @@ async function run() {
   await assert(scanResponse.status === 201, `Unexpected /api/scan status: ${scanResponse.status}`);
   const scanPayload = await scanResponse.json();
   console.log('Scan payload:', scanPayload);
-  await assert(scanPayload.assetCode === '1E3012804 HBJ04724', 'Recorded code mismatch');
+  await assert(scanPayload.assetCode === 'E3012804 HBJ04724', 'Recorded code mismatch');
+  await assert(scanPayload.modelCode === 'E3012804', 'Model code mismatch');
+  await assert(scanPayload.assetTag === 'HBJ04724', 'Asset tag mismatch');
+  await assert(scanPayload.rawCode === '1E3012804 HBJ04724', 'Raw code mismatch');
   await assert(scanPayload.employeeName === 'Alex Johnson', 'Recorded name mismatch');
   await assert(typeof scanPayload.imageKey === 'string' && scanPayload.imageKey.length > 0, 'Missing image key in response');
   await assert(typeof scanPayload.imageUrl === 'string', 'Missing image URL in response');
@@ -40,6 +43,9 @@ async function run() {
   const listPayload = await listResponse.json();
   console.log('Scans list:', listPayload);
   await assert(Array.isArray(listPayload) && listPayload.length === 1, 'Expected one stored scan');
+  await assert(listPayload[0].assetCode === 'E3012804 HBJ04724', 'List payload missing combined code');
+  await assert(listPayload[0].modelCode === 'E3012804', 'List payload missing model code');
+  await assert(listPayload[0].assetTag === 'HBJ04724', 'List payload missing asset tag');
   await assert(listPayload[0].imageUrl === scanPayload.imageUrl, 'List payload missing image URL');
 
   const imageResponse = await worker.fetch(new Request(scanPayload.imageUrl), env);
@@ -53,6 +59,8 @@ async function run() {
   console.log('CSV export:\n', csvText);
   await assert(csvText.includes('Alex Johnson'), 'CSV missing employee name');
   await assert(csvText.includes('/api/scans/1/image'), 'CSV missing image link');
+  await assert(csvText.includes('E3012804'), 'CSV missing model code');
+  await assert(csvText.includes('HBJ04724'), 'CSV missing asset tag');
 }
 
 run()

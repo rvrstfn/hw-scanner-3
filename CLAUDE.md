@@ -65,7 +65,7 @@ npm run test
 - Only linear barcodes supported (no QR codes)
 
 ### Database Schema
-- Simple scan tracking: `employee_name`, `asset_code`, `image_key`, `created_at`
+- Simple scan tracking: `employee_name`, `model_code`, `asset_tag`, `raw_code`, `image_key`, `created_at`
 - All successful scans archived with audit trail
 
 ### Mobile-First Design

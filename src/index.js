@@ -1237,9 +1237,14 @@ const HTML_PAGE = `<!DOCTYPE html>
           }
 
           const archiveMessage = payload.imageUrl ? ' Photo archived for reference.' : '';
+          const modelPart = payload.modelCode || '';
+          const assetPart = payload.assetTag || '';
+          const displayCode =
+            (modelPart && assetPart ? modelPart + ' / ' + assetPart : payload.assetCode || payload.rawCode || 'asset')
+              .trim();
           const message =
             'Registered ' +
-            payload.assetCode +
+            displayCode +
             ' for ' +
             payload.employeeName +
             ' at ' +
@@ -1403,7 +1408,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
     </header>
     <main>
       <div class="toolbar">
-        <input id="search" type="search" placeholder="Search by employee or asset code" />
+        <input id="search" type="search" placeholder="Search by employee, model, or asset tag" />
         <button id="refresh-btn" type="button">Refresh</button>
         <a class="ghost" href="/api/scans.csv" download>Download CSV</a>
       </div>
@@ -1412,14 +1417,15 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           <thead>
             <tr>
               <th>Employee</th>
-              <th>Asset Code</th>
+              <th>Model Code</th>
+              <th>Asset Tag</th>
               <th>Captured At</th>
               <th>Archived Photo</th>
             </tr>
           </thead>
           <tbody id="scan-rows">
             <tr class="empty">
-              <td colspan="4">Loading scans…</td>
+              <td colspan="5">Loading scans…</td>
             </tr>
           </tbody>
         </table>
@@ -1442,14 +1448,16 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 
       function renderRows(list) {
         if (!list || list.length === 0) {
-          tbody.innerHTML = '<tr class="empty"><td colspan="4">No scans recorded yet.</td></tr>';
+          tbody.innerHTML = '<tr class="empty"><td colspan="5">No scans recorded yet.</td></tr>';
           return;
         }
 
         const rows = list
           .map((scan) => {
             const employee = scan.employeeName ?? '';
-            const asset = scan.assetCode ?? '';
+            const modelCode = scan.modelCode ?? '';
+            const assetTag = scan.assetTag ?? '';
+            const combined = scan.assetCode ?? [modelCode, assetTag].filter(Boolean).join(' ');
             const captured = formatDate(scan.createdAt);
             const photo = scan.imageUrl
               ? '<a href=\"' +
@@ -1457,7 +1465,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
                 '\" target=\"_blank\" rel=\"noopener\"><img src=\"' +
                 scan.imageUrl +
                 '\" alt=\"Barcode photo for ' +
-                asset +
+                (combined || 'asset') +
                 '\" class=\"thumbnail\" loading=\"lazy\" /></a>'
               : '<em>No photo stored</em>';
             return (
@@ -1466,7 +1474,10 @@ const ADMIN_PAGE = `<!DOCTYPE html>
               employee +
               '</td>' +
               '<td>' +
-              asset +
+              modelCode +
+              '</td>' +
+              '<td>' +
+              assetTag +
               '</td>' +
               '<td>' +
               captured +
@@ -1490,8 +1501,17 @@ const ADMIN_PAGE = `<!DOCTYPE html>
         }
         const filtered = scans.filter((scan) => {
           const employee = scan.employeeName?.toLowerCase() ?? '';
-          const asset = scan.assetCode?.toLowerCase() ?? '';
-          return employee.includes(term) || asset.includes(term);
+          const model = scan.modelCode?.toLowerCase() ?? '';
+          const asset = scan.assetTag?.toLowerCase() ?? '';
+          const combined = scan.assetCode?.toLowerCase() ?? '';
+          const raw = scan.rawCode?.toLowerCase() ?? '';
+          return (
+            employee.includes(term) ||
+            model.includes(term) ||
+            asset.includes(term) ||
+            combined.includes(term) ||
+            raw.includes(term)
+          );
         });
         renderRows(filtered);
       }
@@ -1507,7 +1527,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
         });
       }
       async function fetchScans() {
-        tbody.innerHTML = '<tr class="empty"><td colspan="4">Loading scans…</td></tr>';
+        tbody.innerHTML = '<tr class="empty"><td colspan="5">Loading scans…</td></tr>';
         try {
           const response = await fetch('/api/scans');
           if (!response.ok) {
@@ -1516,7 +1536,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           scans = await response.json();
           applyFilter();
         } catch (error) {
-          tbody.innerHTML = '<tr class="empty"><td colspan="4">' + error.message + '</td></tr>';
+          tbody.innerHTML = '<tr class="empty"><td colspan="5">' + error.message + '</td></tr>';
         }
       }
 
@@ -1607,7 +1627,20 @@ function buildImageUrl(request, scanId) {
   return url.toString();
 }
 
-async function storeArchiveImage(env, buffer, { type, employeeName, assetCode, originalFilename, sourceSize }) {
+async function storeArchiveImage(
+  env,
+  buffer,
+  {
+    type,
+    employeeName,
+    modelCode,
+    assetTag,
+    rawCode,
+    assetCode,
+    originalFilename,
+    sourceSize,
+  },
+) {
   if (!env.ARCHIVE_BUCKET) {
     throw new Error('Archive storage is not configured');
   }
@@ -1616,6 +1649,9 @@ async function storeArchiveImage(env, buffer, { type, employeeName, assetCode, o
 
   const customMetadata = {};
   if (employeeName) customMetadata.employeeName = employeeName;
+  if (modelCode) customMetadata.modelCode = modelCode;
+  if (assetTag) customMetadata.assetTag = assetTag;
+  if (rawCode) customMetadata.rawCode = rawCode;
   if (assetCode) customMetadata.assetCode = assetCode;
   if (originalFilename) customMetadata.originalFilename = originalFilename;
   if (sourceSize) customMetadata.originalSize = String(sourceSize);
@@ -1645,6 +1681,45 @@ function handleOptions(request) {
     'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers') ?? 'Content-Type',
   };
   return new Response(null, { status: 204, headers });
+}
+
+function parseBarcodeIdentifiers(rawText) {
+  const normalized = String(rawText ?? '').trim().replace(/\s+/g, ' ');
+  if (!normalized) {
+    throw new Error('The barcode value was empty.');
+  }
+
+  const parts = normalized.split(' ');
+  if (parts.length < 2) {
+    throw new Error('The barcode did not include both model and asset identifiers.');
+  }
+
+  const assetCandidate = parts.pop().toUpperCase();
+  const modelCandidateRaw = parts.join('');
+
+  const ASSET_TAG_PATTERN = /^[A-Z]{3}\d{4,5}$/;
+  if (!ASSET_TAG_PATTERN.test(assetCandidate)) {
+    throw new Error('The detected asset tag did not match expected laptop codes. Please rescan the sticker.');
+  }
+
+  let modelCandidate = modelCandidateRaw.toUpperCase();
+  if (modelCandidate.startsWith('1') && modelCandidate.length > 1) {
+    modelCandidate = modelCandidate.slice(1);
+  }
+
+  const MODEL_PATTERN = /^[A-Z0-9-]{4,16}$/;
+  if (!MODEL_PATTERN.test(modelCandidate)) {
+    throw new Error('The detected model code looked incorrect. Please retry with the hardware label.');
+  }
+
+  const combined = `${modelCandidate} ${assetCandidate}`.trim();
+
+  return {
+    rawCode: normalized,
+    modelCode: modelCandidate,
+    assetTag: assetCandidate,
+    assetCode: combined,
+  };
 }
 
 async function handleScan(request, env) {
@@ -1679,13 +1754,17 @@ async function handleScan(request, env) {
   try {
     const buffer = await image.arrayBuffer();
     const result = await decodeLinearBarcode(buffer);
+    const identifiers = parseBarcodeIdentifiers(result.text);
 
     let imageKey;
     try {
       imageKey = await storeArchiveImage(env, buffer, {
         type: image.type,
         employeeName,
-        assetCode: result.text,
+        modelCode: identifiers.modelCode,
+        assetTag: identifiers.assetTag,
+        rawCode: identifiers.rawCode,
+        assetCode: identifiers.assetCode,
         originalFilename: formData.get('originalFilename') ? String(formData.get('originalFilename')) : undefined,
         sourceSize: formData.get('sourceSize') ? Number(formData.get('sourceSize')) : undefined,
       });
@@ -1697,9 +1776,9 @@ async function handleScan(request, env) {
     let inserted;
     try {
       inserted = await env.SCANS_DB.prepare(
-        'INSERT INTO scans (employee_name, asset_code, image_key) VALUES (?1, ?2, ?3) RETURNING id, created_at',
+        'INSERT INTO scans (employee_name, model_code, asset_tag, raw_code, image_key) VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, created_at',
       )
-        .bind(employeeName, result.text, imageKey)
+        .bind(employeeName, identifiers.modelCode, identifiers.assetTag, identifiers.rawCode, imageKey)
         .first();
     } catch (dbError) {
       await env.ARCHIVE_BUCKET.delete?.(imageKey).catch(() => {});
@@ -1712,7 +1791,10 @@ async function handleScan(request, env) {
     return jsonResponse(
       {
         employeeName,
-        assetCode: result.text,
+        modelCode: identifiers.modelCode,
+        assetTag: identifiers.assetTag,
+        assetCode: identifiers.assetCode,
+        rawCode: identifiers.rawCode,
         barcodeFormat: result.format,
         createdAt,
         imageKey,
@@ -1728,23 +1810,29 @@ async function handleScan(request, env) {
 
 async function handleScans(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT id, employee_name AS employeeName, asset_code AS assetCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    'SELECT id, employee_name AS employeeName, model_code AS modelCode, asset_tag AS assetTag, raw_code AS rawCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
   ).all();
-  const scans = (results ?? []).map((row) => ({
-    ...row,
-    imageUrl: row.imageKey ? buildImageUrl(request, row.id) : null,
-  }));
+  const scans = (results ?? []).map((row) => {
+    const assetCode = row.modelCode && row.assetTag ? `${row.modelCode} ${row.assetTag}`.trim() : row.rawCode ?? '';
+    return {
+      ...row,
+      assetCode,
+      imageUrl: row.imageKey ? buildImageUrl(request, row.id) : null,
+    };
+  });
   return jsonResponse(scans);
 }
 
 async function handleCsv(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT id, employee_name AS employeeName, asset_code AS assetCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    'SELECT id, employee_name AS employeeName, model_code AS modelCode, asset_tag AS assetTag, raw_code AS rawCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
   ).all();
-  const headers = ['Employee Name', 'Asset Code', 'Created At', 'Image URL'];
+  const headers = ['Employee Name', 'Model Code', 'Asset Tag', 'Raw Barcode', 'Created At', 'Image URL'];
   const rows = (results ?? []).map((row) => {
     const imageUrl = row.imageKey ? buildImageUrl(request, row.id) : '';
-    return [row.employeeName, row.assetCode, row.createdAt, imageUrl]
+    const combined = row.modelCode && row.assetTag ? `${row.modelCode} ${row.assetTag}`.trim() : '';
+    const rawBarcode = row.rawCode ?? combined;
+    return [row.employeeName, row.modelCode, row.assetTag, rawBarcode, row.createdAt, imageUrl]
       .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
       .join(',');
   });
