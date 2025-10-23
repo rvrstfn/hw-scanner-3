@@ -433,11 +433,23 @@ const HTML_PAGE = `<!DOCTYPE html>
         font-weight: 600;
         color: #111827;
       }
+      .employee-line {
+        display: block;
+        line-height: 1.2;
+      }
+      .employee-primary {
+        font-size: 1.05rem;
+      }
+      .employee-secondary {
+        margin-top: 0.15rem;
+        font-size: 0.95rem;
+        color: #374151;
+      }
       .employee-email {
-        margin-top: 0.35rem;
+        margin-top: 0.4rem;
         font-size: 0.85rem;
         color: #6b7280;
-        word-break: break-all;
+        word-break: break-word;
       }
       .employee-card .employee-name mark {
         background: rgba(59, 130, 246, 0.2);
@@ -668,12 +680,15 @@ const HTML_PAGE = `<!DOCTYPE html>
           border-color: #60a5fa;
           box-shadow: 0 8px 25px rgba(96, 165, 250, 0.2);
         }
-        .employee-card .employee-name {
-          color: #f9fafb;
-        }
-        .employee-email {
-          color: #cbd5f5;
-        }
+      .employee-card .employee-name {
+        color: #f9fafb;
+      }
+      .employee-secondary {
+        color: #e2e8f0;
+      }
+      .employee-email {
+        color: #cbd5f5;
+      }
         .employee-card .employee-name mark {
           background: rgba(96, 165, 250, 0.25);
           color: #bfdbfe;
@@ -850,7 +865,9 @@ const HTML_PAGE = `<!DOCTYPE html>
       // Generate avatar initials and colors
       function getEmployeeAvatar(employee) {
         const source =
+          (employee && employee.englishFullName) ||
           (employee && employee.displayName) ||
+          (employee && employee.koreanName) ||
           (employee && employee.name) ||
           (employee && employee.email) ||
           '';
@@ -916,8 +933,10 @@ const HTML_PAGE = `<!DOCTYPE html>
         const query = searchTerm.toLowerCase();
         filteredEmployees = employees.filter((employee) => {
           const haystacks = [
-            employee.displayName ?? '',
+            employee.englishName ?? '',
+            employee.name ?? '',
             employee.email ?? '',
+            employee.displayName ?? '',
           ]
             .join(' ')
             .toLowerCase();
@@ -935,8 +954,18 @@ const HTML_PAGE = `<!DOCTYPE html>
         employeesGrid.innerHTML = filteredEmployees
           .map((employee, index) => {
             const avatar = getEmployeeAvatar(employee);
-            const highlighted = highlightText(employee.displayName ?? '', searchTerm);
-            const emailLine = employee.email ? '<div class="employee-email">' + employee.email + '</div>' : '';
+            const primaryName = employee.englishName || employee.name || employee.displayName || '';
+            const secondaryName = employee.englishName && employee.name && employee.englishName !== employee.name
+              ? employee.name
+              : '';
+            const highlightedPrimary = highlightText(primaryName, searchTerm);
+            const highlightedSecondary = secondaryName ? highlightText(secondaryName, searchTerm) : '';
+            const emailLine = employee.email
+              ? '<span class="employee-line employee-email">' + highlightText(employee.email, searchTerm) + '</span>'
+              : '';
+            const secondaryLine = highlightedSecondary
+              ? '<span class="employee-line employee-secondary">' + highlightedSecondary + '</span>'
+              : '';
 
             return (
               '<div class="employee-card" data-index="' +
@@ -948,7 +977,10 @@ const HTML_PAGE = `<!DOCTYPE html>
               avatar.initials +
               '</div>' +
               '<div class="employee-name">' +
-              highlighted +
+              '<span class="employee-line employee-primary">' +
+              highlightedPrimary +
+              '</span>' +
+              secondaryLine +
               emailLine +
               '</div>' +
               '</div>'
@@ -1071,7 +1103,9 @@ const HTML_PAGE = `<!DOCTYPE html>
           employees = (Array.isArray(employeesData) ? employeesData : [])
             .map((entry) => {
               if (entry && typeof entry === 'object') {
-                const displayName = (entry.displayName || entry.name || entry.email || '').trim();
+                const englishFullName = (entry.englishFullName || entry.englishName || '').trim();
+                const koreanName = (entry.koreanName || entry.name || '').trim();
+                const displayName = (entry.displayName || englishFullName || koreanName || entry.email || '').trim();
                 if (!displayName) return null;
                 return {
                   displayName,
@@ -1079,8 +1113,11 @@ const HTML_PAGE = `<!DOCTYPE html>
                   location: entry.location ?? null,
                   department: entry.department ?? null,
                   employeeId: entry.employeeId ?? null,
-                  name: entry.name ?? null,
-                  englishName: entry.englishName ?? null,
+                  name: koreanName || null,
+                  koreanName: koreanName || null,
+                  englishName: englishFullName || null,
+                  englishFullName: englishFullName || null,
+                  surname: entry.surname ?? null,
                 };
               }
               const displayName = String(entry ?? '').trim();
@@ -1092,7 +1129,9 @@ const HTML_PAGE = `<!DOCTYPE html>
                 department: null,
                 employeeId: null,
                 name: displayName,
-                englishName: null,
+                koreanName: displayName,
+                englishName: displayName,
+                englishFullName: displayName,
               };
             })
             .filter(Boolean);
@@ -1801,6 +1840,23 @@ function composeDisplayName(row) {
   return display.trim();
 }
 
+function toTitleCase(value) {
+  if (!value) return '';
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function formatEnglishName(given, surname) {
+  const parts = [];
+  if (typeof given === 'string' && given.trim()) parts.push(toTitleCase(given.trim()));
+  if (typeof surname === 'string' && surname.trim()) parts.push(toTitleCase(surname.trim()));
+  return parts.join(' ').trim();
+}
+
 async function loadEmployeeDirectory(env) {
   if (!env?.SCANS_DB?.prepare) {
     return {
@@ -1840,7 +1896,9 @@ async function loadEmployeeDirectory(env) {
         if (!email) {
           return null;
         }
-        const displayName = composeDisplayName(row);
+        const englishFullName = formatEnglishName(row.english_name, row.surname);
+        const koreanName = typeof row.name === 'string' ? row.name.trim() : '';
+        const displayName = englishFullName || composeDisplayName(row);
         const department = [row.org1, row.org2, row.org3]
           .filter((value) => typeof value === 'string' && value.trim().length > 0)
           .map((value) => value.trim())
@@ -1850,8 +1908,10 @@ async function loadEmployeeDirectory(env) {
         return {
           email,
           displayName,
-          name: typeof row.name === 'string' ? row.name.trim() : null,
-          englishName: typeof row.english_name === 'string' ? row.english_name.trim() : null,
+          name: koreanName || null,
+          koreanName: koreanName || null,
+          englishName: englishFullName || null,
+          englishFullName: englishFullName || null,
           surname: typeof row.surname === 'string' ? row.surname.trim() : null,
           location: location || null,
           department: department || null,
@@ -1868,12 +1928,14 @@ async function loadEmployeeDirectory(env) {
   }
 
   return {
-    employees: EMPLOYEES.map((name) => ({
-      displayName: name,
-      email: null,
-      location: null,
-      department: null,
-    })),
+      employees: EMPLOYEES.map((name) => ({
+        displayName: name,
+        email: null,
+        location: null,
+        department: null,
+        englishFullName: name,
+        koreanName: name,
+      })),
     requireEmail: false,
   };
 }
