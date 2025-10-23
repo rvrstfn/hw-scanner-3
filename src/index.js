@@ -54,6 +54,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background: #f5f5f5;
         color: #111;
+        --keyboard-offset: 0px;
       }
       body {
         margin: 0;
@@ -272,14 +273,19 @@ const HTML_PAGE = `<!DOCTYPE html>
         inset: 0;
         z-index: 9999;
         display: flex;
-        align-items: flex-end;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        padding: calc(env(safe-area-inset-top) + 0.75rem) 0 calc(env(safe-area-inset-bottom) + var(--keyboard-offset, 0px)) 0;
         opacity: 0;
         visibility: hidden;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+        transition: opacity 0.25s ease;
       }
       .employee-modal:not(.hidden) {
         opacity: 1;
         visibility: visible;
+        pointer-events: auto;
       }
       .modal-backdrop {
         position: absolute;
@@ -289,17 +295,15 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
       .modal-container {
         position: relative;
-        width: 100%;
-        max-height: 85vh;
+        width: min(520px, 100%);
+        max-height: none;
+        height: calc(100% - env(safe-area-inset-top));
         background: #fff;
         border-radius: 24px 24px 0 0;
         display: flex;
         flex-direction: column;
-        transform: translateY(100%);
-        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .employee-modal:not(.hidden) .modal-container {
-        transform: translateY(0);
+        overflow: hidden;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
       }
       .modal-header {
         display: flex;
@@ -792,11 +796,39 @@ const HTML_PAGE = `<!DOCTYPE html>
       const statusBox = document.getElementById('status');
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
+      const rootElement = document.documentElement;
 
       let employees = [];
       let filteredEmployees = [];
       let selectedEmployee = null;
       let searchTimeout;
+      let viewportHandler;
+
+      function updateKeyboardOffset() {
+        if (!window.visualViewport) return;
+        const viewport = window.visualViewport;
+        const offset = Math.max(
+          0,
+          window.innerHeight - viewport.height - viewport.offsetTop
+        );
+        rootElement.style.setProperty('--keyboard-offset', offset + 'px');
+      }
+
+      function enableKeyboardTracking() {
+        if (!window.visualViewport || viewportHandler) return;
+        viewportHandler = updateKeyboardOffset;
+        window.visualViewport.addEventListener('resize', viewportHandler);
+        window.visualViewport.addEventListener('scroll', viewportHandler);
+        updateKeyboardOffset();
+      }
+
+      function disableKeyboardTracking() {
+        if (!window.visualViewport || !viewportHandler) return;
+        window.visualViewport.removeEventListener('resize', viewportHandler);
+        window.visualViewport.removeEventListener('scroll', viewportHandler);
+        viewportHandler = null;
+        rootElement.style.setProperty('--keyboard-offset', '0px');
+      }
 
       // Generate avatar initials and colors
       function getEmployeeAvatar(name) {
@@ -880,6 +912,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       function openModal() {
         employeeModal.classList.remove('hidden');
         employeeSearch.value = '';
+        enableKeyboardTracking();
         employeeSearch.focus();
         renderEmployees();
         document.body.style.overflow = 'hidden';
@@ -891,6 +924,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         document.body.style.overflow = '';
         employeeSearch.value = '';
         clearSearchBtn.classList.add('hidden');
+        disableKeyboardTracking();
       }
 
       // Select employee
