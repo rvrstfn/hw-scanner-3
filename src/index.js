@@ -1692,6 +1692,51 @@ function jsonResponse(body, init) {
   });
 }
 
+function rotateGrayscale(data, width, height, angle) {
+  if (angle === 0) {
+    return { data, width, height };
+  }
+
+  if (angle === 180) {
+    const rotated = new Uint8ClampedArray(data.length);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIndex = y * width + x;
+        const destIndex = (height - 1 - y) * width + (width - 1 - x);
+        rotated[destIndex] = data[srcIndex];
+      }
+    }
+    return { data: rotated, width, height };
+  }
+
+  const rotated = new Uint8ClampedArray(data.length);
+  const newWidth = height;
+  const newHeight = width;
+
+  if (angle === 90) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const srcIndex = y * width + x;
+        const destX = height - 1 - y;
+        const destY = x;
+        rotated[destY * newWidth + destX] = data[srcIndex];
+      }
+    }
+    return { data: rotated, width: newWidth, height: newHeight };
+  }
+
+  // angle === 270
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const srcIndex = y * width + x;
+      const destX = y;
+      const destY = width - 1 - x;
+      rotated[destY * newWidth + destX] = data[srcIndex];
+    }
+  }
+  return { data: rotated, width: newWidth, height: newHeight };
+}
+
 async function decodeLinearBarcode(imageBuffer) {
   const decoded = decodeJpeg(new Uint8Array(imageBuffer), { useTArray: true });
   if (!decoded || !decoded.data) {
@@ -1712,31 +1757,46 @@ async function decodeLinearBarcode(imageBuffer) {
     }
   }
 
-  const luminanceSource = new RGBLuminanceSource(grayscale, width, height);
-  const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
-
+  const reader = new MultiFormatReader();
   const hints = new Map();
   hints.set(DecodeHintType.POSSIBLE_FORMATS, LINEAR_FORMATS);
   hints.set(DecodeHintType.TRY_HARDER, true);
-
-  const reader = new MultiFormatReader();
   reader.setHints(hints);
 
-  try {
-    const result = reader.decode(binaryBitmap);
-    if (!LINEAR_FORMATS.includes(result.getBarcodeFormat())) {
-      throw new NotFoundException();
+  const rotations = [0, 90, 180, 270];
+  let lastError;
+
+  for (const angle of rotations) {
+    const { data: rotatedData, width: rotatedWidth, height: rotatedHeight } = rotateGrayscale(
+      grayscale,
+      width,
+      height,
+      angle,
+    );
+
+    const luminanceSource = new RGBLuminanceSource(rotatedData, rotatedWidth, rotatedHeight);
+    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+
+    try {
+      const result = reader.decode(binaryBitmap);
+      if (!LINEAR_FORMATS.includes(result.getBarcodeFormat())) {
+        throw new NotFoundException();
+      }
+      return {
+        text: result.getText(),
+        format: BarcodeFormat[result.getBarcodeFormat()],
+      };
+    } catch (error) {
+      reader.reset();
+      if (error instanceof NotFoundException) {
+        lastError = error;
+        continue;
+      }
+      throw error;
     }
-    return {
-      text: result.getText(),
-      format: BarcodeFormat[result.getBarcodeFormat()],
-    };
-  } catch (err) {
-    if (err instanceof NotFoundException) {
-      throw new Error('No supported linear barcode found in the supplied image');
-    }
-    throw err;
   }
+
+  throw new Error('No supported linear barcode found in the supplied image');
 }
 
 function randomId() {
