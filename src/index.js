@@ -281,6 +281,8 @@ const HTML_PAGE = `<!DOCTYPE html>
         visibility: hidden;
         pointer-events: none;
         transition: opacity 0.25s ease;
+        overflow: hidden;
+        overscroll-behavior: contain;
       }
       .employee-modal:not(.hidden) {
         opacity: 1;
@@ -304,6 +306,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         flex-direction: column;
         overflow: hidden;
         box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+        overscroll-behavior: contain;
       }
       .modal-header {
         display: flex;
@@ -397,6 +400,8 @@ const HTML_PAGE = `<!DOCTYPE html>
         grid-template-columns: 1fr;
         gap: 0.75rem;
         min-height: 200px;
+        align-content: flex-start;
+        overscroll-behavior: contain;
       }
       .employee-card {
         background: #fff;
