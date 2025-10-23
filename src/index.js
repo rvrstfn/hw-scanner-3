@@ -433,6 +433,24 @@ const HTML_PAGE = `<!DOCTYPE html>
         font-weight: 600;
         color: #111827;
       }
+      .employee-hints {
+        margin-top: 0.35rem;
+        font-size: 0.85rem;
+        color: #6b7280;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+      }
+      .employee-hints .employee-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.1);
+        color: #1d4ed8;
+        font-size: 0.78rem;
+      }
       .employee-card .employee-name mark {
         background: rgba(59, 130, 246, 0.2);
         color: #1d4ed8;
@@ -714,6 +732,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           </div>
         </button>
         <input type="hidden" id="employee" name="employee" required />
+        <input type="hidden" id="employee-email" name="employeeEmail" />
 
         <!-- Employee Selection Modal -->
         <div id="employee-modal" class="employee-modal hidden">
@@ -789,6 +808,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 
       // Modern Modal Employee Selector
       const employeeInput = document.getElementById('employee');
+      const employeeEmailInput = document.getElementById('employee-email');
       const employeeSelector = document.getElementById('employee-selector');
       const selectedEmployeeDisplay = document.getElementById('selected-employee');
       const employeeModal = document.getElementById('employee-modal');
@@ -808,6 +828,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       let selectedEmployee = null;
       let searchTimeout;
       let viewportHandler;
+      let rosterRequiresEmail = false;
 
       function updateKeyboardOffset() {
         if (!window.visualViewport) return;
@@ -836,11 +857,18 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
 
       // Generate avatar initials and colors
-      function getEmployeeAvatar(name) {
-        const initials = name.split(' ')
-          .map(word => word.charAt(0))
+      function getEmployeeAvatar(employee) {
+        const source =
+          (employee && employee.displayName) ||
+          (employee && employee.name) ||
+          (employee && employee.email) ||
+          '';
+        const initials = source
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((word) => word.charAt(0).toUpperCase())
           .join('')
-          .substring(0, 2);
+          .substring(0, 2) || '?';
 
         // Generate consistent color based on name
         const colors = [
@@ -853,7 +881,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
           'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
         ];
-        const colorIndex = name.length % colors.length;
+        const colorIndex = source.length % colors.length;
         return { initials, background: colors[colorIndex] };
       }
 
@@ -871,25 +899,41 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
 
       // Update selected employee display
-      function updateSelectedEmployee(employeeName) {
-        selectedEmployee = employeeName;
-        employeeInput.value = employeeName;
+      function updateSelectedEmployee(employee) {
+        selectedEmployee = employee;
 
-        const avatar = getEmployeeAvatar(employeeName);
+        const displayName = employee?.displayName ?? '';
+        employeeInput.value = displayName;
+        employeeEmailInput.value = employee?.email ?? '';
+        if (rosterRequiresEmail) {
+          employeeEmailInput.setAttribute('required', 'required');
+        } else {
+          employeeEmailInput.removeAttribute('required');
+        }
+
+        const avatar = getEmployeeAvatar(employee);
         const avatarElement = selectedEmployeeDisplay.querySelector('.employee-avatar');
         const nameElement = selectedEmployeeDisplay.querySelector('span');
 
         avatarElement.textContent = avatar.initials;
         avatarElement.style.background = avatar.background;
-        nameElement.textContent = employeeName;
+        nameElement.textContent = displayName || 'Tap to select your name';
       }
 
       // Render employee cards
       function renderEmployees(searchTerm = '') {
         const query = searchTerm.toLowerCase();
-        filteredEmployees = employees.filter(name =>
-          name.toLowerCase().includes(query)
-        );
+        filteredEmployees = employees.filter((employee) => {
+          const haystacks = [
+            employee.displayName ?? '',
+            employee.email ?? '',
+            employee.location ?? '',
+            employee.department ?? '',
+          ]
+            .join(' ')
+            .toLowerCase();
+          return haystacks.includes(query);
+        });
 
         if (filteredEmployees.length === 0) {
           employeesGrid.innerHTML = '';
@@ -900,15 +944,32 @@ const HTML_PAGE = `<!DOCTYPE html>
         emptyState.classList.add('hidden');
 
         employeesGrid.innerHTML = filteredEmployees
-          .map(name => {
-            const avatar = getEmployeeAvatar(name);
-            const highlighted = highlightText(name, searchTerm);
-            return '<div class="employee-card" data-name="' + name + '">' +
-                   '<div class="employee-avatar" style="background: ' + avatar.background + '">' +
-                   avatar.initials +
-                   '</div>' +
-                   '<div class="employee-name">' + highlighted + '</div>' +
-                   '</div>';
+          .map((employee, index) => {
+            const avatar = getEmployeeAvatar(employee);
+            const highlighted = highlightText(employee.displayName ?? '', searchTerm);
+            const metaPieces = [
+              employee.email ? '<span class="employee-meta">' + employee.email + '</span>' : '',
+              employee.location ? '<span class="employee-meta">' + employee.location + '</span>' : '',
+              employee.department ? '<span class="employee-meta">' + employee.department + '</span>' : '',
+            ].filter(Boolean);
+
+            return (
+              '<div class="employee-card" data-index="' +
+              index +
+              '">' +
+              '<div class="employee-avatar" style="background: ' +
+              avatar.background +
+              '">' +
+              avatar.initials +
+              '</div>' +
+              '<div class="employee-name">' +
+              highlighted +
+              (metaPieces.length
+                ? '<div class="employee-hints">' + metaPieces.join(' · ') + '</div>'
+                : '') +
+              '</div>' +
+              '</div>'
+            );
           })
           .join('');
       }
@@ -933,8 +994,8 @@ const HTML_PAGE = `<!DOCTYPE html>
       }
 
       // Select employee
-      function selectEmployee(employeeName) {
-        updateSelectedEmployee(employeeName);
+      function selectEmployee(employee) {
+        updateSelectedEmployee(employee);
         closeModal();
 
         // Add subtle success feedback
@@ -959,8 +1020,10 @@ const HTML_PAGE = `<!DOCTYPE html>
       employeesGrid.addEventListener('click', (event) => {
         const card = event.target.closest('.employee-card');
         if (card) {
-          const employeeName = card.dataset.name;
-          selectEmployee(employeeName);
+          const index = Number(card.dataset.index);
+          if (!Number.isNaN(index) && filteredEmployees[index]) {
+            selectEmployee(filteredEmployees[index]);
+          }
         }
       });
 
@@ -1022,7 +1085,47 @@ const HTML_PAGE = `<!DOCTYPE html>
           const res = await fetch('/api/employees');
           if (!res.ok) throw new Error('Failed to load employees');
           const employeesData = await res.json();
-          employees = employeesData;
+          employees = (Array.isArray(employeesData) ? employeesData : [])
+            .map((entry) => {
+              if (entry && typeof entry === 'object') {
+                const displayName = (entry.displayName || entry.name || entry.email || '').trim();
+                if (!displayName) return null;
+                return {
+                  displayName,
+                  email: entry.email ? String(entry.email).toLowerCase() : null,
+                  location: entry.location ?? null,
+                  department: entry.department ?? null,
+                  employeeId: entry.employeeId ?? null,
+                  name: entry.name ?? null,
+                  englishName: entry.englishName ?? null,
+                };
+              }
+              const displayName = String(entry ?? '').trim();
+              if (!displayName) return null;
+              return {
+                displayName,
+                email: null,
+                location: null,
+                department: null,
+                employeeId: null,
+                name: displayName,
+                englishName: null,
+              };
+            })
+            .filter(Boolean);
+
+          rosterRequiresEmail = employees.length > 0 && employees.every((entry) => Boolean(entry.email));
+          if (rosterRequiresEmail) {
+            employeeEmailInput.setAttribute('required', 'required');
+          } else {
+            employeeEmailInput.removeAttribute('required');
+          }
+          if (!employees.length) {
+            showStatus('No employees found in the roster.', 'error');
+          } else {
+            showStatus('Ready to scan!', 'success');
+            setTimeout(() => statusBox.classList.remove('show'), 2000);
+          }
 
           // Hide loading skeleton
           const loadingState = document.querySelector('.loading-state');
@@ -1030,9 +1133,7 @@ const HTML_PAGE = `<!DOCTYPE html>
             loadingState.style.display = 'none';
           }
 
-          // Show success briefly
-          showStatus('Ready to scan!', 'success');
-          setTimeout(() => statusBox.classList.remove('show'), 2000);
+          renderEmployees();
         } catch (err) {
           showStatus('Failed to load employees. Please refresh.', 'error');
 
@@ -1218,6 +1319,9 @@ const HTML_PAGE = `<!DOCTYPE html>
 
           const formData = new FormData();
           formData.append('employeeName', employeeName);
+          if (employeeEmailInput.value) {
+            formData.append('employeeEmail', employeeEmailInput.value);
+          }
           formData.append('image', preparedFile, preparedFile.name || file.name || 'barcode.jpg');
           if (preparedFile.originalName) {
             formData.append('originalFilename', preparedFile.originalName);
@@ -1408,7 +1512,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
     </header>
     <main>
       <div class="toolbar">
-        <input id="search" type="search" placeholder="Search by employee, model, or asset tag" />
+        <input id="search" type="search" placeholder="Search by employee, email, model, or asset tag" />
         <button id="refresh-btn" type="button">Refresh</button>
         <a class="ghost" href="/api/scans.csv" download>Download CSV</a>
       </div>
@@ -1417,6 +1521,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           <thead>
             <tr>
               <th>Employee</th>
+              <th>Email</th>
               <th>Model Code</th>
               <th>Asset Tag</th>
               <th>Captured At</th>
@@ -1425,7 +1530,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           </thead>
           <tbody id="scan-rows">
             <tr class="empty">
-              <td colspan="5">Loading scans…</td>
+              <td colspan="6">Loading scans…</td>
             </tr>
           </tbody>
         </table>
@@ -1448,13 +1553,14 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 
       function renderRows(list) {
         if (!list || list.length === 0) {
-          tbody.innerHTML = '<tr class="empty"><td colspan="5">No scans recorded yet.</td></tr>';
+          tbody.innerHTML = '<tr class="empty"><td colspan="6">No scans recorded yet.</td></tr>';
           return;
         }
 
         const rows = list
           .map((scan) => {
             const employee = scan.employeeName ?? '';
+            const email = scan.employeeEmail ?? '';
             const modelCode = scan.modelCode ?? '';
             const assetTag = scan.assetTag ?? '';
             const combined = scan.assetCode ?? [modelCode, assetTag].filter(Boolean).join(' ');
@@ -1472,6 +1578,9 @@ const ADMIN_PAGE = `<!DOCTYPE html>
               '<tr>' +
               '<td>' +
               employee +
+              '</td>' +
+              '<td>' +
+              email +
               '</td>' +
               '<td>' +
               modelCode +
@@ -1501,12 +1610,14 @@ const ADMIN_PAGE = `<!DOCTYPE html>
         }
         const filtered = scans.filter((scan) => {
           const employee = scan.employeeName?.toLowerCase() ?? '';
+          const email = scan.employeeEmail?.toLowerCase() ?? '';
           const model = scan.modelCode?.toLowerCase() ?? '';
           const asset = scan.assetTag?.toLowerCase() ?? '';
           const combined = scan.assetCode?.toLowerCase() ?? '';
           const raw = scan.rawCode?.toLowerCase() ?? '';
           return (
             employee.includes(term) ||
+            email.includes(term) ||
             model.includes(term) ||
             asset.includes(term) ||
             combined.includes(term) ||
@@ -1527,7 +1638,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
         });
       }
       async function fetchScans() {
-        tbody.innerHTML = '<tr class="empty"><td colspan="5">Loading scans…</td></tr>';
+        tbody.innerHTML = '<tr class="empty"><td colspan="6">Loading scans…</td></tr>';
         try {
           const response = await fetch('/api/scans');
           if (!response.ok) {
@@ -1536,7 +1647,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
           scans = await response.json();
           applyFilter();
         } catch (error) {
-          tbody.innerHTML = '<tr class="empty"><td colspan="5">' + error.message + '</td></tr>';
+          tbody.innerHTML = '<tr class="empty"><td colspan="6">' + error.message + '</td></tr>';
         }
       }
 
@@ -1633,6 +1744,7 @@ async function storeArchiveImage(
   {
     type,
     employeeName,
+    employeeEmail,
     modelCode,
     assetTag,
     rawCode,
@@ -1649,6 +1761,7 @@ async function storeArchiveImage(
 
   const customMetadata = {};
   if (employeeName) customMetadata.employeeName = employeeName;
+  if (employeeEmail) customMetadata.employeeEmail = employeeEmail;
   if (modelCode) customMetadata.modelCode = modelCode;
   if (assetTag) customMetadata.assetTag = assetTag;
   if (rawCode) customMetadata.rawCode = rawCode;
@@ -1681,6 +1794,105 @@ function handleOptions(request) {
     'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers') ?? 'Content-Type',
   };
   return new Response(null, { status: 204, headers });
+}
+
+function composeDisplayName(row) {
+  const primary = typeof row.name === 'string' ? row.name.trim() : '';
+  const englishParts = [row.english_name, row.surname]
+    .filter((part) => typeof part === 'string' && part.trim().length > 0)
+    .map((part) => part.trim());
+  const englishName = englishParts.join(' ');
+  const emailLocalPart = typeof row.email === 'string' ? row.email.split('@')[0] : '';
+
+  let display = primary || englishName || emailLocalPart || 'Unnamed Employee';
+
+  if (
+    primary &&
+    englishName &&
+    englishName.toLowerCase() !== primary.toLowerCase() &&
+    !primary.includes(englishName)
+  ) {
+    display = `${primary} (${englishName})`;
+  }
+
+  return display.trim();
+}
+
+async function loadEmployeeDirectory(env) {
+  if (!env?.SCANS_DB?.prepare) {
+    return {
+      employees: EMPLOYEES.map((name) => ({
+        displayName: name,
+        email: null,
+        location: null,
+        department: null,
+      })),
+      requireEmail: false,
+    };
+  }
+
+  try {
+    const { results } = await env.SCANS_DB.prepare(
+      `SELECT
+        employee_id,
+        name,
+        english_name,
+        surname,
+        email,
+        location,
+        org1,
+        org2,
+        org3
+       FROM employees
+       WHERE active = 1 AND email IS NOT NULL
+       ORDER BY name COLLATE NOCASE`,
+    ).all();
+
+    const employees = (results ?? [])
+      .map((row) => {
+        if (!row?.email) {
+          return null;
+        }
+        const email = String(row.email).trim().toLowerCase();
+        if (!email) {
+          return null;
+        }
+        const displayName = composeDisplayName(row);
+        const department = [row.org1, row.org2, row.org3]
+          .filter((value) => typeof value === 'string' && value.trim().length > 0)
+          .map((value) => value.trim())
+          .join(' • ');
+        const location = typeof row.location === 'string' ? row.location.trim() : null;
+
+        return {
+          email,
+          displayName,
+          name: typeof row.name === 'string' ? row.name.trim() : null,
+          englishName: typeof row.english_name === 'string' ? row.english_name.trim() : null,
+          surname: typeof row.surname === 'string' ? row.surname.trim() : null,
+          location: location || null,
+          department: department || null,
+          employeeId: row.employee_id != null ? String(row.employee_id) : null,
+        };
+      })
+      .filter(Boolean);
+
+    if (employees.length > 0) {
+      return { employees, requireEmail: true };
+    }
+  } catch (error) {
+    console.warn('Falling back to static roster; failed to load employees table.', error);
+  }
+
+  return {
+    employees: EMPLOYEES.map((name) => ({
+      displayName: name,
+      email: null,
+      location: null,
+      department: null,
+    })),
+    requireEmail: false,
+  };
 }
 
 function parseBarcodeIdentifiers(rawText) {
@@ -1733,15 +1945,40 @@ async function handleScan(request, env) {
 
   const formData = await request.formData();
   const employeeName = String(formData.get('employeeName') ?? '').trim();
+  const employeeEmailRaw = String(formData.get('employeeEmail') ?? '').trim().toLowerCase();
   const image = formData.get('image');
 
-  if (!employeeName) {
-    return jsonResponse({ error: 'Employee name is required.' }, { status: 400 });
+  if (!employeeName && !employeeEmailRaw) {
+    return jsonResponse({ error: 'Employee selection is required.' }, { status: 400 });
   }
 
-  if (!EMPLOYEES.includes(employeeName)) {
-    return jsonResponse({ error: 'Employee not found in roster. Check spelling or update the roster.' }, { status: 404 });
+  const { employees: roster, requireEmail } = await loadEmployeeDirectory(env);
+
+  let matchedEmployee = null;
+
+  if (requireEmail) {
+    if (!employeeEmailRaw) {
+      return jsonResponse({ error: 'Employee email was missing from the submission. Please refresh and try again.' }, { status: 400 });
+    }
+    matchedEmployee = roster.find((entry) => entry.email === employeeEmailRaw);
+    if (!matchedEmployee) {
+      return jsonResponse({ error: 'Employee not found or inactive in the roster. Please refresh the list.' }, { status: 404 });
+    }
+  } else {
+    if (!employeeName) {
+      return jsonResponse({ error: 'Employee name is required.' }, { status: 400 });
+    }
+    matchedEmployee = roster.find(
+      (entry) => entry.displayName.toLowerCase() === employeeName.toLowerCase(),
+    );
+    if (!matchedEmployee) {
+      return jsonResponse({ error: 'Employee not found in roster. Check spelling or update the roster.' }, { status: 404 });
+    }
   }
+
+  const canonicalEmployeeName =
+    matchedEmployee.displayName || matchedEmployee.name || matchedEmployee.email || employeeName;
+  const canonicalEmployeeEmail = matchedEmployee.email ?? (employeeEmailRaw || null);
 
   if (!(image instanceof File)) {
     return jsonResponse({ error: 'Image file was not included in the upload.' }, { status: 400 });
@@ -1760,7 +1997,8 @@ async function handleScan(request, env) {
     try {
       imageKey = await storeArchiveImage(env, buffer, {
         type: image.type,
-        employeeName,
+        employeeName: canonicalEmployeeName,
+        employeeEmail: canonicalEmployeeEmail,
         modelCode: identifiers.modelCode,
         assetTag: identifiers.assetTag,
         rawCode: identifiers.rawCode,
@@ -1776,9 +2014,16 @@ async function handleScan(request, env) {
     let inserted;
     try {
       inserted = await env.SCANS_DB.prepare(
-        'INSERT INTO scans (employee_name, model_code, asset_tag, raw_code, image_key) VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id, created_at',
+        'INSERT INTO scans (employee_name, employee_email, model_code, asset_tag, raw_code, image_key) VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id, created_at',
       )
-        .bind(employeeName, identifiers.modelCode, identifiers.assetTag, identifiers.rawCode, imageKey)
+        .bind(
+          canonicalEmployeeName,
+          canonicalEmployeeEmail,
+          identifiers.modelCode,
+          identifiers.assetTag,
+          identifiers.rawCode,
+          imageKey,
+        )
         .first();
     } catch (dbError) {
       await env.ARCHIVE_BUCKET.delete?.(imageKey).catch(() => {});
@@ -1790,7 +2035,8 @@ async function handleScan(request, env) {
 
     return jsonResponse(
       {
-        employeeName,
+        employeeName: canonicalEmployeeName,
+        employeeEmail: canonicalEmployeeEmail,
         modelCode: identifiers.modelCode,
         assetTag: identifiers.assetTag,
         assetCode: identifiers.assetCode,
@@ -1810,7 +2056,17 @@ async function handleScan(request, env) {
 
 async function handleScans(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT id, employee_name AS employeeName, model_code AS modelCode, asset_tag AS assetTag, raw_code AS rawCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    `SELECT
+      id,
+      employee_name AS employeeName,
+      employee_email AS employeeEmail,
+      model_code AS modelCode,
+      asset_tag AS assetTag,
+      raw_code AS rawCode,
+      image_key AS imageKey,
+      created_at AS createdAt
+     FROM scans
+     ORDER BY created_at DESC`,
   ).all();
   const scans = (results ?? []).map((row) => {
     const assetCode = row.modelCode && row.assetTag ? `${row.modelCode} ${row.assetTag}`.trim() : row.rawCode ?? '';
@@ -1825,14 +2081,32 @@ async function handleScans(request, env) {
 
 async function handleCsv(request, env) {
   const { results } = await env.SCANS_DB.prepare(
-    'SELECT id, employee_name AS employeeName, model_code AS modelCode, asset_tag AS assetTag, raw_code AS rawCode, image_key AS imageKey, created_at AS createdAt FROM scans ORDER BY created_at DESC',
+    `SELECT
+      id,
+      employee_name AS employeeName,
+      employee_email AS employeeEmail,
+      model_code AS modelCode,
+      asset_tag AS assetTag,
+      raw_code AS rawCode,
+      image_key AS imageKey,
+      created_at AS createdAt
+     FROM scans
+     ORDER BY created_at DESC`,
   ).all();
-  const headers = ['Employee Name', 'Model Code', 'Asset Tag', 'Raw Barcode', 'Created At', 'Image URL'];
+  const headers = ['Employee Name', 'Employee Email', 'Model Code', 'Asset Tag', 'Raw Barcode', 'Created At', 'Image URL'];
   const rows = (results ?? []).map((row) => {
     const imageUrl = row.imageKey ? buildImageUrl(request, row.id) : '';
     const combined = row.modelCode && row.assetTag ? `${row.modelCode} ${row.assetTag}`.trim() : '';
     const rawBarcode = row.rawCode ?? combined;
-    return [row.employeeName, row.modelCode, row.assetTag, rawBarcode, row.createdAt, imageUrl]
+    return [
+      row.employeeName,
+      row.employeeEmail,
+      row.modelCode,
+      row.assetTag,
+      rawBarcode,
+      row.createdAt,
+      imageUrl,
+    ]
       .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
       .join(',');
   });
@@ -1898,7 +2172,8 @@ export default {
     }
 
     if (url.pathname === '/api/employees' && request.method === 'GET') {
-      return jsonResponse(EMPLOYEES);
+      const directory = await loadEmployeeDirectory(env);
+      return jsonResponse(directory.employees);
     }
 
     if (url.pathname === '/api/scan' && request.method === 'POST') {

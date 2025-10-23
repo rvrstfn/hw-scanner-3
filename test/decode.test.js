@@ -20,6 +20,7 @@ async function run() {
 
   const formData = new FormData();
   formData.append('employeeName', 'Alex Johnson');
+  formData.append('employeeEmail', 'alex.johnson@example.com');
   formData.append('image', new File([image], 'barcode.jpg', { type: 'image/jpeg' }));
 
   const scanResponse = await worker.fetch(
@@ -34,6 +35,7 @@ async function run() {
   await assert(scanPayload.assetTag === 'HBJ04724', 'Asset tag mismatch');
   await assert(scanPayload.rawCode === '1E3012804 HBJ04724', 'Raw code mismatch');
   await assert(scanPayload.employeeName === 'Alex Johnson', 'Recorded name mismatch');
+  await assert(scanPayload.employeeEmail === 'alex.johnson@example.com', 'Recorded email mismatch');
   await assert(typeof scanPayload.imageKey === 'string' && scanPayload.imageKey.length > 0, 'Missing image key in response');
   await assert(typeof scanPayload.imageUrl === 'string', 'Missing image URL in response');
   await assert(env.ARCHIVE_BUCKET.store.size === 1, 'Archive image was not stored');
@@ -46,6 +48,7 @@ async function run() {
   await assert(listPayload[0].assetCode === 'E3012804 HBJ04724', 'List payload missing combined code');
   await assert(listPayload[0].modelCode === 'E3012804', 'List payload missing model code');
   await assert(listPayload[0].assetTag === 'HBJ04724', 'List payload missing asset tag');
+  await assert(listPayload[0].employeeEmail === 'alex.johnson@example.com', 'List payload missing employee email');
   await assert(listPayload[0].imageUrl === scanPayload.imageUrl, 'List payload missing image URL');
 
   const imageResponse = await worker.fetch(new Request(scanPayload.imageUrl), env);
@@ -58,6 +61,7 @@ async function run() {
   const csvText = await csvResponse.text();
   console.log('CSV export:\n', csvText);
   await assert(csvText.includes('Alex Johnson'), 'CSV missing employee name');
+  await assert(csvText.toLowerCase().includes('alex.johnson@example.com'), 'CSV missing employee email');
   await assert(csvText.includes('/api/scans/1/image'), 'CSV missing image link');
   await assert(csvText.includes('E3012804'), 'CSV missing model code');
   await assert(csvText.includes('HBJ04724'), 'CSV missing asset tag');

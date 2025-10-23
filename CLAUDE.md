@@ -65,13 +65,14 @@ npm run test
 - Only linear barcodes supported (no QR codes)
 
 ### Database Schema
-- `scans`: `employee_name`, `model_code`, `asset_tag`, `raw_code`, `image_key`, `created_at`
+- `scans`: `employee_name`, `employee_email`, `model_code`, `asset_tag`, `raw_code`, `image_key`, `created_at`
 - `employees`: HR roster ingested via `scripts/sync-employees.mjs` (unique `email`, soft delete through `active`/`deleted_at`)
 - All successful scans archived with audit trail
 
 ### HR Roster Sync
 - Run `npm run sync:employees -- --file "<absolute path to HR XLSX>" --remote` to push updates into D1
 - Uses the first sheet in the workbook, expects an `E-mail` column (local-part allowed; defaults domain to `@intercos.com`)
+- Worker endpoints now source `/api/employees` and runtime validation from the `employees` table (falls back to static list if empty)
 
 ### Mobile-First Design
 - Responsive UI optimized for phone cameras

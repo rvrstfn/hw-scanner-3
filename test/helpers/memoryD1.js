@@ -1,6 +1,20 @@
 export function createMemoryD1() {
   const scans = [];
   let nextId = 1;
+  const employees = [
+    {
+      id: 1,
+      active: 1,
+      name: 'Alex Johnson',
+      english_name: 'Alex Johnson',
+      surname: null,
+      email: 'alex.johnson@example.com',
+      location: 'HQ',
+      org1: 'IT',
+      org2: 'Operations',
+      org3: null,
+    },
+  ];
 
   function normalizeSelectResults(results) {
     return results
@@ -11,6 +25,7 @@ export function createMemoryD1() {
           row.model_code && row.asset_tag ? `${row.model_code} ${row.asset_tag}`.trim() : row.raw_code ?? '';
         return {
           employeeName: row.employee_name,
+          employeeEmail: row.employee_email,
           modelCode: row.model_code,
           assetTag: row.asset_tag,
           rawCode: row.raw_code,
@@ -32,11 +47,12 @@ export function createMemoryD1() {
         },
         async first() {
           if (trimmed.startsWith('INSERT INTO SCANS')) {
-            const [employeeName, modelCode, assetTag, rawCode, imageKey] = this.args ?? [];
+            const [employeeName, employeeEmail, modelCode, assetTag, rawCode, imageKey] = this.args ?? [];
             const createdAt = new Date().toISOString();
             const record = {
               id: nextId++,
               employee_name: employeeName,
+              employee_email: employeeEmail,
               model_code: modelCode,
               asset_tag: assetTag,
               raw_code: rawCode,
@@ -48,6 +64,30 @@ export function createMemoryD1() {
           }
 
           if (trimmed.startsWith('SELECT')) {
+            if (trimmed.includes('FROM EMPLOYEES')) {
+              const activeEmployees = employees
+                .filter((row) => row.active)
+                .map((row) => ({
+                  name: row.name,
+                  english_name: row.english_name,
+                  surname: row.surname,
+                  email: row.email,
+                  location: row.location,
+                  org1: row.org1,
+                  org2: row.org2,
+                  org3: row.org3,
+                  employee_id: row.id,
+                }));
+
+              if (trimmed.includes('WHERE') && trimmed.includes('EMAIL = ?')) {
+                const [email] = this.args ?? [];
+                const match = activeEmployees.find((row) => row.email === email);
+                return match ?? null;
+              }
+
+              return { results: activeEmployees };
+            }
+
             if (trimmed.includes('WHERE ID')) {
               const [id] = this.args ?? [];
               const record = scans.find((row) => row.id === Number(id));
@@ -56,6 +96,7 @@ export function createMemoryD1() {
               }
               return {
                 employeeName: record.employee_name,
+                employeeEmail: record.employee_email,
                 modelCode: record.model_code,
                 assetTag: record.asset_tag,
                 rawCode: record.raw_code,

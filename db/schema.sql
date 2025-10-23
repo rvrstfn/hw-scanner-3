@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS employees;
 CREATE TABLE scans (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   employee_name TEXT NOT NULL,
+  employee_email TEXT,
   model_code TEXT NOT NULL,
   asset_tag TEXT NOT NULL,
   raw_code TEXT NOT NULL,
