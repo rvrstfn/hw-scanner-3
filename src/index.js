@@ -433,23 +433,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         font-weight: 600;
         color: #111827;
       }
-      .employee-hints {
+      .employee-email {
         margin-top: 0.35rem;
         font-size: 0.85rem;
         color: #6b7280;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-      }
-      .employee-hints .employee-meta {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-        padding: 0.2rem 0.5rem;
-        border-radius: 999px;
-        background: rgba(59, 130, 246, 0.1);
-        color: #1d4ed8;
-        font-size: 0.78rem;
+        word-break: break-all;
       }
       .employee-card .employee-name mark {
         background: rgba(59, 130, 246, 0.2);
@@ -682,6 +670,9 @@ const HTML_PAGE = `<!DOCTYPE html>
         }
         .employee-card .employee-name {
           color: #f9fafb;
+        }
+        .employee-email {
+          color: #cbd5f5;
         }
         .employee-card .employee-name mark {
           background: rgba(96, 165, 250, 0.25);
@@ -927,8 +918,6 @@ const HTML_PAGE = `<!DOCTYPE html>
           const haystacks = [
             employee.displayName ?? '',
             employee.email ?? '',
-            employee.location ?? '',
-            employee.department ?? '',
           ]
             .join(' ')
             .toLowerCase();
@@ -947,11 +936,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           .map((employee, index) => {
             const avatar = getEmployeeAvatar(employee);
             const highlighted = highlightText(employee.displayName ?? '', searchTerm);
-            const metaPieces = [
-              employee.email ? '<span class="employee-meta">' + employee.email + '</span>' : '',
-              employee.location ? '<span class="employee-meta">' + employee.location + '</span>' : '',
-              employee.department ? '<span class="employee-meta">' + employee.department + '</span>' : '',
-            ].filter(Boolean);
+            const emailLine = employee.email ? '<div class="employee-email">' + employee.email + '</div>' : '';
 
             return (
               '<div class="employee-card" data-index="' +
@@ -964,9 +949,7 @@ const HTML_PAGE = `<!DOCTYPE html>
               '</div>' +
               '<div class="employee-name">' +
               highlighted +
-              (metaPieces.length
-                ? '<div class="employee-hints">' + metaPieces.join(' · ') + '</div>'
-                : '') +
+              emailLine +
               '</div>' +
               '</div>'
             );
