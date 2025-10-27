@@ -8,6 +8,7 @@ import {
   RGBLuminanceSource,
 } from '@zxing/library';
 import { decode as decodeJpeg } from 'jpeg-js';
+import { hasOcrSupport, runOcrFallback } from './ocrFallback.js';
 
 const LINEAR_FORMATS = [
   BarcodeFormat.CODE_128,
@@ -2188,8 +2189,52 @@ async function handleScan(request, env) {
 
   try {
     const buffer = await image.arrayBuffer();
-    const result = await decodeLinearBarcode(buffer);
-    const identifiers = parseBarcodeIdentifiers(result.text);
+    let identifiers;
+    let barcodeFormat = null;
+    let rawBarcodeText = null;
+    let decodeStrategy = 'barcode';
+    let ocrDiagnostics = null;
+
+    try {
+      const result = await decodeLinearBarcode(buffer);
+      barcodeFormat = result.format;
+      rawBarcodeText = result.text;
+      identifiers = parseBarcodeIdentifiers(result.text);
+    } catch (primaryError) {
+      if (!hasOcrSupport(env)) {
+        throw primaryError;
+      }
+
+      try {
+        const ocrResult = await runOcrFallback(env, buffer, {
+          filename: image.name,
+          contentType: image.type,
+        });
+        const fallbackIdentifiers = parseBarcodeIdentifiers(ocrResult.rawCombined);
+        identifiers = fallbackIdentifiers;
+        barcodeFormat = 'OCR';
+        rawBarcodeText = ocrResult.rawCombined;
+        decodeStrategy = 'ocr';
+        ocrDiagnostics = {
+          valid: ocrResult.structured?.valid ?? null,
+          errors: Array.isArray(ocrResult.structured?.errors) ? ocrResult.structured.errors : [],
+          statuses: {
+            model_code: ocrResult.structured?.fields?.model_code?.status ?? null,
+            asset_code: ocrResult.structured?.fields?.asset_code?.status ?? null,
+          },
+          confidence: {
+            model_code: ocrResult.structured?.fields?.model_code?.confidence ?? null,
+            asset_code: ocrResult.structured?.fields?.asset_code?.confidence ?? null,
+          },
+        };
+      } catch (fallbackError) {
+        const primaryMessage =
+          primaryError instanceof Error ? primaryError.message : 'Barcode decoding failed.';
+        const fallbackMessage =
+          fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        throw new Error(`${primaryMessage} (OCR fallback failed: ${fallbackMessage})`);
+      }
+    }
 
     let imageKey;
     try {
@@ -2199,7 +2244,7 @@ async function handleScan(request, env) {
         employeeEmail: canonicalEmployeeEmail,
         modelCode: identifiers.modelCode,
         assetTag: identifiers.assetTag,
-        rawCode: identifiers.rawCode,
+        rawCode: rawBarcodeText ?? identifiers.rawCode,
         assetCode: identifiers.assetCode,
         originalFilename: formData.get('originalFilename') ? String(formData.get('originalFilename')) : undefined,
         sourceSize: formData.get('sourceSize') ? Number(formData.get('sourceSize')) : undefined,
@@ -2219,7 +2264,7 @@ async function handleScan(request, env) {
           canonicalEmployeeEmail,
           identifiers.modelCode,
           identifiers.assetTag,
-          identifiers.rawCode,
+          rawBarcodeText ?? identifiers.rawCode,
           imageKey,
         )
         .first();
@@ -2238,8 +2283,10 @@ async function handleScan(request, env) {
         modelCode: identifiers.modelCode,
         assetTag: identifiers.assetTag,
         assetCode: identifiers.assetCode,
-        rawCode: identifiers.rawCode,
-        barcodeFormat: result.format,
+        rawCode: rawBarcodeText ?? identifiers.rawCode,
+        barcodeFormat,
+        decodeStrategy,
+        ocr: decodeStrategy === 'ocr' ? ocrDiagnostics : undefined,
         createdAt,
         imageKey,
         imageUrl: buildVersionedImageUrl(request, scanId, imageKey),

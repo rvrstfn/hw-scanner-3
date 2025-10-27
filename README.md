@@ -8,6 +8,7 @@ Cloudflare Worker that powers a mobile-friendly web app for logging laptop barco
 - Employee roster with search suggestions
 - Camera capture + upload workflow (`POST /api/scan`)
 - Automatic barcode decode via ZXing (linear formats only)
+- GPT-5-mini OCR fallback when barcodes cannot be decoded (requires `OPENAI_API_KEY`)
 - Client-side resize/compress before upload (max edge ~1600 px, JPEG ~70 % quality)
 - D1 storage for successful scans (employee, asset code, archived photo key)
 - R2 archive of each barcode photo
@@ -34,7 +35,15 @@ Cloudflare Worker that powers a mobile-friendly web app for logging laptop barco
 
    Update `wrangler.toml` with the bucket name (binding `ARCHIVE_BUCKET`).
 
-4. (Optional) Adjust the employee roster in `src/index.js` (`EMPLOYEES` array).
+4. Store your OpenAI API key as a Worker secret so the OCR fallback can run:
+
+   ```bash
+   wrangler secret put OPENAI_API_KEY
+   ```
+
+   (If the secret is missing, the Worker still runs but only the barcode decoder is used.)
+
+5. (Optional) Adjust the employee roster in `src/index.js` (`EMPLOYEES` array).
 
 If you are upgrading an existing deployment, add the new `image_key` column once:
 
