@@ -57,6 +57,16 @@ const HTML_PAGE = `<!DOCTYPE html>
         color: #111;
         --keyboard-offset: 0px;
       }
+      @media (max-width: 420px) {
+        .card-header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.75rem;
+        }
+        .locale-toggle {
+          align-self: flex-end;
+        }
+      }
       body {
         margin: 0;
         display: flex;
@@ -115,6 +125,37 @@ const HTML_PAGE = `<!DOCTYPE html>
       button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+      }
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .card-header h1 {
+        margin: 0;
+        flex: 1;
+      }
+      .locale-toggle {
+        padding: 0.45rem 0.95rem;
+        border-radius: 999px;
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: rgba(37, 99, 235, 0.08);
+        color: #1d4ed8;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease, border 0.2s ease, transform 0.15s ease;
+      }
+      .locale-toggle:hover {
+        background: rgba(37, 99, 235, 0.15);
+        border-color: rgba(37, 99, 235, 0.3);
+        transform: translateY(-1px);
+      }
+      .locale-toggle:focus-visible {
+        outline: 3px solid rgba(37, 99, 235, 0.35);
+        outline-offset: 2px;
       }
       .form-step {
         margin-bottom: 1.75rem;
@@ -754,20 +795,31 @@ const HTML_PAGE = `<!DOCTYPE html>
         .preview img {
           border-color: rgba(96, 165, 250, 0.4);
         }
+        .locale-toggle {
+          background: rgba(147, 197, 253, 0.16);
+          border-color: rgba(147, 197, 253, 0.35);
+          color: #bfdbfe;
+        }
+        .locale-toggle:hover {
+          background: rgba(147, 197, 253, 0.24);
+        }
       }
     </style>
   </head>
   <body>
     <main class="card">
-      <h1>Hardware inventory</h1>
+      <div class="card-header">
+        <h1 data-i18n="title">Hardware inventory</h1>
+        <button type="button" id="locale-toggle" class="locale-toggle" aria-label="Switch language"></button>
+      </div>
       <form id="scan-form">
         <section class="form-step">
-          <p class="step-heading"><span class="step-number">1.</span> Select your name</p>
+          <p class="step-heading"><span class="step-number">1.</span> <span class="step-label" data-i18n="step1.heading">Select your name</span></p>
           <button type="button" id="employee-selector" class="employee-selector">
             <div class="employee-selector-content">
               <div class="selected-employee" id="selected-employee">
                 <div class="employee-avatar">?</div>
-                <span>Select</span>
+                <span class="selected-label" id="selected-employee-label" data-i18n="step1.selectButton">Select</span>
               </div>
               <svg class="selector-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -783,7 +835,7 @@ const HTML_PAGE = `<!DOCTYPE html>
           <div class="modal-backdrop"></div>
           <div class="modal-container">
             <div class="modal-header">
-              <h2>Select Employee</h2>
+              <h2 data-i18n="modal.title">Select Employee</h2>
               <button type="button" id="close-modal" class="close-button">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                   <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -796,7 +848,7 @@ const HTML_PAGE = `<!DOCTYPE html>
                   <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
                   <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2"/>
                 </svg>
-                <input type="search" id="employee-search" placeholder="Search employees..." autocomplete="off">
+                <input type="search" id="employee-search" placeholder="Search employees..." autocomplete="off" data-i18n="modal.search" data-i18n-attr="placeholder">
                 <button type="button" id="clear-search" class="clear-search hidden">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -813,14 +865,14 @@ const HTML_PAGE = `<!DOCTYPE html>
             </div>
             <div class="empty-state hidden" id="empty-state">
               <div class="empty-icon">🔍</div>
-              <h3>No employees found</h3>
-              <p>Try adjusting your search terms</p>
+              <h3 data-i18n="modal.emptyTitle">No employees found</h3>
+              <p data-i18n="modal.emptySubtitle">Try adjusting your search terms</p>
             </div>
           </div>
         </div>
         <section class="form-step">
-          <p class="step-heading"><span class="step-number">2.</span> Take a photo of the label</p>
-          <label class="visually-hidden" for="image">Upload barcode photo</label>
+          <p class="step-heading"><span class="step-number">2.</span> <span class="step-label" data-i18n="step2.heading">Take a photo of the label</span></p>
+          <label class="visually-hidden" for="image" data-i18n="actions.uploadAria">Upload barcode photo</label>
           <input
             id="image"
             name="image"
@@ -831,21 +883,21 @@ const HTML_PAGE = `<!DOCTYPE html>
             required
           />
           <div class="upload-buttons">
-            <button id="upload-trigger" type="button" class="upload-trigger">Capture with camera</button>
-            <button id="gallery-trigger" type="button" class="upload-trigger secondary">Choose from gallery</button>
+            <button id="upload-trigger" type="button" class="upload-trigger" data-i18n="actions.capture">Capture with camera</button>
+            <button id="gallery-trigger" type="button" class="upload-trigger secondary" data-i18n="actions.gallery">Choose from gallery</button>
           </div>
           <div id="preview" class="preview hidden">
             <img id="preview-image" alt="Selected barcode preview" />
             <div>
-              <strong>Preview</strong>
+              <strong data-i18n="preview.label">Preview</strong>
               <p id="preview-meta"></p>
             </div>
           </div>
         </section>
 
         <section class="form-step">
-          <p class="step-heading"><span class="step-number">3.</span> Upload</p>
-          <button id="submit-btn" type="submit">Upload label</button>
+          <p class="step-heading"><span class="step-number">3.</span> <span class="step-label" data-i18n="step3.heading">Upload</span></p>
+          <button id="submit-btn" type="submit" data-i18n="actions.submit">Upload label</button>
         </section>
       </form>
       <div id="status" class="status" role="status"></div>
@@ -854,12 +906,174 @@ const HTML_PAGE = `<!DOCTYPE html>
     <script type="module">
       const MAX_UPLOAD_DIMENSION = 1600;
       const JPEG_QUALITY = 0.7;
+      const LANGUAGE_STORAGE_KEY = 'hw-scanner-lang';
+      const TRANSLATIONS = {
+        en: {
+          pageTitle: 'Hardware Scanner',
+          title: 'Hardware inventory',
+          step1: {
+            heading: 'Select your name',
+            selectButton: 'Select',
+          },
+          step2: {
+            heading: 'Take a photo of the label',
+          },
+          step3: {
+            heading: 'Upload',
+          },
+          modal: {
+            title: 'Select Employee',
+            search: 'Search employees...',
+            emptyTitle: 'No employees found',
+            emptySubtitle: 'Try adjusting your search terms',
+          },
+          actions: {
+            capture: 'Capture with camera',
+            gallery: 'Choose from gallery',
+            submit: 'Upload label',
+            uploadAria: 'Upload barcode photo',
+          },
+          preview: {
+            label: 'Preview',
+          },
+          status: {
+            noEmployees: 'No employees found in the roster.',
+            ready: 'Ready to scan!',
+            loadError: 'Failed to load employees. Please refresh.',
+            selectEmployee: 'Please select your name before uploading.',
+            takePhoto: 'Please take a photo of the barcode.',
+            uploading: 'Uploading and decoding barcode{sizeDetails}…',
+            unableToRegister: 'Unable to register this scan, please try again.',
+            unexpected: 'Unexpected error, please retry.',
+            registered: 'Registered {code} for {name} at {time}.',
+            archiveNote: ' Photo archived for reference.',
+            processingResponse: 'Server returned an unexpected response while processing the scan.',
+          },
+          errors: {
+            htmlResponse: 'Server sent an unexpected HTML response. Please retry.',
+            unexpectedResponse: 'Server sent an unexpected response. Please try again.',
+            emptyResponse: 'Server sent an empty response. Please try again.',
+          },
+          toggle: {
+            switchToEnglish: 'Switch to English',
+            switchToKorean: 'Switch to Korean',
+          },
+        },
+        ko: {
+          pageTitle: '하드웨어 스캐너',
+          title: '하드웨어 자산 등록',
+          step1: {
+            heading: '이름을 선택하세요',
+            selectButton: '선택',
+          },
+          step2: {
+            heading: '라벨을 촬영하세요',
+          },
+          step3: {
+            heading: '업로드',
+          },
+          modal: {
+            title: '직원 선택',
+            search: '직원 검색...',
+            emptyTitle: '직원을 찾을 수 없습니다',
+            emptySubtitle: '검색어를 바꿔보세요',
+          },
+          actions: {
+            capture: '카메라로 촬영',
+            gallery: '갤러리에서 선택',
+            submit: '라벨 업로드',
+            uploadAria: '바코드 사진 업로드',
+          },
+          preview: {
+            label: '미리보기',
+          },
+          status: {
+            noEmployees: '직원 목록을 찾을 수 없습니다.',
+            ready: '스캔할 준비가 되었습니다!',
+            loadError: '직원 목록을 불러오지 못했습니다. 새로고침 해주세요.',
+            selectEmployee: '업로드 전에 이름을 선택하세요.',
+            takePhoto: '바코드 사진을 촬영하세요.',
+            uploading: '바코드를 업로드하고 해석하는 중{sizeDetails}…',
+            unableToRegister: '스캔을 저장하지 못했습니다. 다시 시도하세요.',
+            unexpected: '예기치 못한 오류가 발생했습니다. 다시 시도하세요.',
+            registered: '{name}님에게 {code}를 {time}에 등록했습니다.',
+            archiveNote: ' 참고용 사진이 보관되었습니다.',
+            processingResponse: '스캔을 처리하는 동안 서버 응답이 올바르지 않았습니다.',
+          },
+          errors: {
+            htmlResponse: '서버가 예상치 못한 HTML 응답을 보냈습니다. 다시 시도하세요.',
+            unexpectedResponse: '서버가 예상치 못한 응답을 보냈습니다. 다시 시도하세요.',
+            emptyResponse: '서버 응답이 비어 있습니다. 다시 시도하세요.',
+          },
+          toggle: {
+            switchToEnglish: '영어로 전환',
+            switchToKorean: '한국어로 전환',
+          },
+        },
+      };
+      const LANGUAGE_TO_LOCALE = {
+        en: 'en-US',
+        ko: 'ko-KR',
+      };
+
+      function resolveTranslation(language, key) {
+        const parts = key.split('.');
+        let result = TRANSLATIONS[language] ?? TRANSLATIONS.en;
+        for (const part of parts) {
+          if (result && typeof result === 'object' && part in result) {
+            result = result[part];
+          } else {
+            return undefined;
+          }
+        }
+        return typeof result === 'string' ? result : undefined;
+      }
+
+      function t(key, replacements = {}) {
+        const template =
+          resolveTranslation(currentLanguage, key) ??
+          resolveTranslation('en', key) ??
+          key;
+        return template.replace(/\{(\w+)\}/g, (match, token) => {
+          if (token in replacements) {
+            return String(replacements[token]);
+          }
+          return '';
+        });
+      }
+
+      function inferLanguageFromNavigator() {
+        const candidates = Array.isArray(navigator.languages) && navigator.languages.length
+          ? navigator.languages
+          : [navigator.language].filter(Boolean);
+        for (const candidate of candidates) {
+          if (typeof candidate === 'string' && candidate.toLowerCase().startsWith('ko')) {
+            return 'ko';
+          }
+        }
+        return 'en';
+      }
+
+      function detectInitialLanguage() {
+        try {
+          const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+          if (stored && stored in TRANSLATIONS) {
+            return stored;
+          }
+        } catch (error) {
+          console.warn('Unable to read language preference from storage.', error);
+        }
+        return inferLanguageFromNavigator();
+      }
+
+      let currentLanguage = detectInitialLanguage();
 
       // Modern Modal Employee Selector
       const employeeInput = document.getElementById('employee');
       const employeeEmailInput = document.getElementById('employee-email');
       const employeeSelector = document.getElementById('employee-selector');
       const selectedEmployeeDisplay = document.getElementById('selected-employee');
+      const selectedEmployeeLabel = document.getElementById('selected-employee-label');
       const employeeModal = document.getElementById('employee-modal');
       const closeModalBtn = document.getElementById('close-modal');
       const employeeSearch = document.getElementById('employee-search');
@@ -871,6 +1085,7 @@ const HTML_PAGE = `<!DOCTYPE html>
       const submitBtn = document.getElementById('submit-btn');
       const imageInput = document.getElementById('image');
       const rootElement = document.documentElement;
+      const localeToggle = document.getElementById('locale-toggle');
 
       let employees = [];
       let filteredEmployees = [];
@@ -878,6 +1093,51 @@ const HTML_PAGE = `<!DOCTYPE html>
       let searchTimeout;
       let viewportHandler;
       let rosterRequiresEmail = false;
+
+      function applyTranslations() {
+        document.documentElement.lang = currentLanguage === 'ko' ? 'ko' : 'en';
+        document.title = t('pageTitle');
+        document
+          .querySelectorAll('[data-i18n]')
+          .forEach((element) => {
+            const key = element.getAttribute('data-i18n');
+            if (!key) return;
+            const attr = element.getAttribute('data-i18n-attr');
+            const value = t(key);
+            if (attr === 'placeholder') {
+              element.setAttribute('placeholder', value);
+            } else if (attr === 'aria-label') {
+              element.setAttribute('aria-label', value);
+            } else if (element === selectedEmployeeLabel && selectedEmployee) {
+              // Preserve the selected employee display name.
+              return;
+            } else {
+              element.textContent = value;
+            }
+          });
+        if (!selectedEmployee) {
+          selectedEmployeeLabel.textContent = t('step1.selectButton');
+        }
+        const toggleLabel =
+          currentLanguage === 'en'
+            ? { text: '한국어', aria: t('toggle.switchToKorean') }
+            : { text: 'English', aria: t('toggle.switchToEnglish') };
+        localeToggle.textContent = toggleLabel.text;
+        localeToggle.setAttribute('aria-label', toggleLabel.aria);
+      }
+
+      applyTranslations();
+
+      localeToggle.addEventListener('click', () => {
+        currentLanguage = currentLanguage === 'en' ? 'ko' : 'en';
+        try {
+          localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
+        } catch (error) {
+          console.warn('Unable to persist language selection.', error);
+        }
+        applyTranslations();
+        renderEmployees(employeeSearch.value.trim());
+      });
 
       async function parseJsonResponse(response, contextMessage) {
         try {
@@ -887,12 +1147,12 @@ const HTML_PAGE = `<!DOCTYPE html>
           const trimmed = rawBody.trim();
           console.warn('Non-JSON response received', { contextMessage, trimmed });
           if (trimmed.startsWith('<!DOCTYPE')) {
-            throw new Error(contextMessage || 'Server sent an unexpected HTML response. Please retry.');
+            throw new Error(contextMessage || t('errors.htmlResponse'));
           }
           if (trimmed) {
-            throw new Error(contextMessage || 'Server sent an unexpected response: ' + trimmed.slice(0, 120));
+            throw new Error(contextMessage || t('errors.unexpectedResponse'));
           }
-          throw new Error(contextMessage || 'Server sent an empty response. Please try again.');
+          throw new Error(contextMessage || t('errors.emptyResponse'));
         }
       }
 
@@ -981,11 +1241,15 @@ const HTML_PAGE = `<!DOCTYPE html>
 
         const avatar = getEmployeeAvatar(employee);
         const avatarElement = selectedEmployeeDisplay.querySelector('.employee-avatar');
-        const nameElement = selectedEmployeeDisplay.querySelector('span');
+        const nameElement = selectedEmployeeLabel;
 
         avatarElement.textContent = avatar.initials;
         avatarElement.style.background = avatar.background;
-        nameElement.textContent = displayName || 'Select';
+        if (displayName) {
+          nameElement.textContent = displayName;
+        } else {
+          nameElement.textContent = t('step1.selectButton');
+        }
       }
 
       // Render employee cards
@@ -1158,11 +1422,8 @@ const HTML_PAGE = `<!DOCTYPE html>
       async function loadEmployees() {
         try {
           const res = await fetch('/api/employees');
-          if (!res.ok) throw new Error('Failed to load employees');
-          const employeesData = await parseJsonResponse(
-            res,
-            'Failed to parse employee directory response. Please refresh.',
-          );
+          if (!res.ok) throw new Error(t('status.loadError'));
+          const employeesData = await parseJsonResponse(res, t('status.loadError'));
           employees = (Array.isArray(employeesData) ? employeesData : [])
             .map((entry) => {
               if (entry && typeof entry === 'object') {
@@ -1206,9 +1467,9 @@ const HTML_PAGE = `<!DOCTYPE html>
             employeeEmailInput.removeAttribute('required');
           }
           if (!employees.length) {
-            showStatus('No employees found in the roster.', 'error');
+            showStatus(t('status.noEmployees'), 'error');
           } else {
-            showStatus('Ready to scan!', 'success');
+            showStatus(t('status.ready'), 'success');
             setTimeout(() => statusBox.classList.remove('show'), 2000);
           }
 
@@ -1220,7 +1481,7 @@ const HTML_PAGE = `<!DOCTYPE html>
 
           renderEmployees();
         } catch (err) {
-          showStatus('Failed to load employees. Please refresh.', 'error');
+          showStatus(t('status.loadError'), 'error');
 
           // Hide loading skeleton even on error
           const loadingState = document.querySelector('.loading-state');
@@ -1387,11 +1648,11 @@ const HTML_PAGE = `<!DOCTYPE html>
         const file = imageInput.files && imageInput.files[0];
 
         if (!employeeName) {
-          showStatus('Please select your name before uploading.', 'error');
+          showStatus(t('status.selectEmployee'), 'error');
           return;
         }
         if (!file) {
-          showStatus('Please take a photo of the barcode.', 'error');
+          showStatus(t('status.takePhoto'), 'error');
           return;
         }
 
@@ -1400,7 +1661,7 @@ const HTML_PAGE = `<!DOCTYPE html>
         try {
           const preparedFile = await downscaleImage(file);
           const sizeDetails = preparedFile !== file ? ' (compressed to ' + formatBytes(preparedFile.size) + ')' : '';
-          showStatus('Uploading and decoding barcode' + sizeDetails + '…', 'success');
+          showStatus(t('status.uploading', { sizeDetails }), 'success');
 
           const formData = new FormData();
           formData.append('employeeName', employeeName);
@@ -1418,36 +1679,33 @@ const HTML_PAGE = `<!DOCTYPE html>
             body: formData,
           });
 
-          const payload = await parseJsonResponse(
-            response,
-            'Server returned an unexpected response while processing the scan.',
-          );
+          const payload = await parseJsonResponse(response, t('status.processingResponse'));
           if (!response.ok) {
-            showStatus(payload.error || 'Unable to register this scan, please try again.', 'error');
+            showStatus(payload.error || t('status.unableToRegister'), 'error');
             submitBtn.disabled = false;
             return;
           }
 
-          const archiveMessage = payload.imageUrl ? ' Photo archived for reference.' : '';
+          const archiveMessage = payload.imageUrl ? t('status.archiveNote') : '';
           const modelPart = payload.modelCode || '';
           const assetPart = payload.assetTag || '';
           const displayCode =
             (modelPart && assetPart ? modelPart + ' / ' + assetPart : payload.assetCode || payload.rawCode || 'asset')
               .trim();
+          const formattedTimestamp = new Date(payload.createdAt).toLocaleString(
+            LANGUAGE_TO_LOCALE[currentLanguage],
+          );
           const message =
-            'Registered ' +
-            displayCode +
-            ' for ' +
-            payload.employeeName +
-            ' at ' +
-            new Date(payload.createdAt).toLocaleString() +
-            '.' +
-            archiveMessage;
+            t('status.registered', {
+              code: displayCode,
+              name: payload.employeeName,
+              time: formattedTimestamp,
+            }) + archiveMessage;
           showStatus(message, 'success');
           imageInput.value = '';
           clearPreview();
         } catch (error) {
-          showStatus(error.message || 'Unexpected error, please retry.', 'error');
+          showStatus(error.message || t('status.unexpected'), 'error');
         } finally {
           submitBtn.disabled = false;
         }
