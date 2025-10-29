@@ -1032,9 +1032,11 @@ const HTML_PAGE = `<!DOCTYPE html>
       function t(key, replacements = {}) {
         const template =
           resolveTranslation(currentLanguage, key) ??
-          resolveTranslation('en', key) ??
-          key;
-        return template.replace(/\{(\w+)\}/g, (match, token) => {
+          resolveTranslation('en', key);
+        if (typeof template !== 'string') {
+          return '';
+        }
+        return template.replace(/\{\s*(\w+)\s*\}/g, (match, token) => {
           if (token in replacements) {
             return String(replacements[token]);
           }
@@ -2464,9 +2466,10 @@ async function handleScan(request, env) {
       }
 
       try {
-        const ocrResult = await runOcrFallback(env, buffer, {
+        const ocrResult = await runOcrFallback(buffer, {
           filename: image.name,
           contentType: image.type,
+          apiKey: env.OPENAI_API_KEY,
         });
         const fallbackIdentifiers = parseBarcodeIdentifiers(ocrResult.rawCombined);
         identifiers = fallbackIdentifiers;

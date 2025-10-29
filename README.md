@@ -76,6 +76,17 @@ npm test
 Runs a smoke test against the bundled `barcode-QR-label.jpg` to ensure the decoder still returns the expected barcode (`CODE_128`).
 The test suite uses in-memory D1 and R2 shims, so no real database or bucket is required for CI/local runs.
 
+### Standalone GPT fallback check
+
+To exercise the OCR fallback in isolation (no database writes), point the helper script at any image. Ensure `OPENAI_API_KEY` is exported locally (Wrangler secrets are not available to Node scripts):
+
+```bash
+export OPENAI_API_KEY=sk-...
+npm run ocr:test -- --file /path/to/label.jpg
+```
+
+Use `--content-type` to override the MIME type, `--json` to print only the structured JSON, and `--debug` to dump the raw API response on failure.
+
 ## API overview
 
 - `GET /` – Web app UI
